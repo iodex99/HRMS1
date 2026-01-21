@@ -389,8 +389,10 @@ const DashboardLayout = ({ children }) => {
 
 // Dashboard Page
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [todayAttendance, setTodayAttendance] = useState(null);
+  const [onboardingStatus, setOnboardingStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -399,12 +401,14 @@ const DashboardPage = () => {
 
   const fetchData = async () => {
     try {
-      const [statsRes, attendanceRes] = await Promise.all([
+      const [statsRes, attendanceRes, onboardingRes] = await Promise.all([
         axios.get(`${API_URL}/api/dashboard/stats`),
-        axios.get(`${API_URL}/api/attendance/today`)
+        axios.get(`${API_URL}/api/attendance/today`),
+        axios.get(`${API_URL}/api/onboarding/status`)
       ]);
       setStats(statsRes.data);
       setTodayAttendance(attendanceRes.data);
+      setOnboardingStatus(onboardingRes.data);
     } catch (err) {
       console.error(err);
     } finally {
