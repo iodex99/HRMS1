@@ -1,0 +1,166 @@
+{
+  "brand_identity": {
+    "name": "BambooClone HR",
+    "core_values": ["Clarity", "Trust", "Efficiency", "Human-Centric"],
+    "emotional_tone": "Professional, Approachable, Clean, Airy",
+    "theme_mode": "light"
+  },
+  "design_system": {
+    "colors": {
+      "primary": {
+        "DEFAULT": "#46A758",
+        "foreground": "#FFFFFF",
+        "50": "#F0FDF4",
+        "100": "#DCFCE7",
+        "500": "#46A758",
+        "600": "#16A34A",
+        "900": "#14532D"
+      },
+      "secondary": {
+        "DEFAULT": "#1E293B",
+        "foreground": "#FFFFFF"
+      },
+      "background": {
+        "DEFAULT": "#F8FAFC",
+        "paper": "#FFFFFF"
+      },
+      "text": {
+        "primary": "#0F172A",
+        "secondary": "#64748B",
+        "muted": "#94A3B8"
+      },
+      "status": {
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444",
+        "info": "#3B82F6"
+      }
+    },
+    "typography": {
+      "font_family": {
+        "heading": "Manrope, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "scale": {
+        "h1": "text-4xl font-bold tracking-tight",
+        "h2": "text-3xl font-bold tracking-tight",
+        "h3": "text-2xl font-semibold",
+        "h4": "text-xl font-semibold",
+        "body_lg": "text-lg leading-relaxed",
+        "body_base": "text-base leading-relaxed",
+        "body_sm": "text-sm leading-relaxed",
+        "caption": "text-xs text-muted-foreground"
+      }
+    },
+    "spacing": {
+      "container_padding": "p-6 md:p-8 lg:p-10",
+      "section_gap": "gap-8",
+      "component_gap": "gap-4"
+    },
+    "radius": {
+      "default": "rounded-lg",
+      "card": "rounded-xl",
+      "button": "rounded-md",
+      "input": "rounded-md"
+    },
+    "shadows": {
+      "card": "shadow-sm hover:shadow-md transition-shadow duration-200",
+      "dropdown": "shadow-lg border border-slate-100",
+      "modal": "shadow-2xl"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#46A758] hover:bg-[#16A34A] text-white font-medium px-4 py-2 rounded-md transition-colors shadow-sm",
+      "secondary": "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2 rounded-md transition-colors",
+      "ghost": "text-slate-600 hover:bg-slate-100 hover:text-slate-900 px-3 py-2 rounded-md",
+      "destructive": "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+    },
+    "cards": {
+      "base": "bg-white border border-slate-200 rounded-xl shadow-sm p-6",
+      "interactive": "bg-white border border-slate-200 rounded-xl shadow-sm p-6 hover:border-[#46A758]/50 transition-colors cursor-pointer"
+    },
+    "inputs": {
+      "base": "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#46A758] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    },
+    "tables": {
+      "container": "w-full overflow-auto rounded-lg border border-slate-200 bg-white",
+      "header": "bg-slate-50 text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-3 border-b border-slate-200",
+      "row": "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-0",
+      "cell": "px-6 py-4 whitespace-nowrap text-sm text-slate-700"
+    },
+    "badges": {
+      "success": "bg-green-50 text-green-700 border border-green-200 px-2.5 py-0.5 rounded-full text-xs font-medium",
+      "warning": "bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-medium",
+      "neutral": "bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full text-xs font-medium"
+    }
+  },
+  "layout_patterns": {
+    "dashboard_shell": "min-h-screen bg-[#F8FAFC]",
+    "sidebar": "fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-30 hidden lg:block",
+    "header": "sticky top-0 z-20 w-full bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center px-6 justify-between",
+    "main_content": "lg:pl-64 pt-16 min-h-screen",
+    "page_header": "flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8"
+  },
+  "assets": {
+    "images": {
+      "employees": [
+        {
+          "url": "https://images.unsplash.com/photo-1737574994780-e31827afaed7?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "alt": "Focused professional working",
+          "category": "hero_employee"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1671450960874-0903baf942c5?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "alt": "Employee portrait",
+          "category": "avatar_male"
+        },
+        {
+          "url": "https://images.pexels.com/photos/7581015/pexels-photo-7581015.jpeg",
+          "alt": "Professional woman",
+          "category": "avatar_female"
+        }
+      ],
+      "logos": [
+        {
+          "url": "https://images.unsplash.com/photo-1628760584600-6c31148991e9?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "alt": "Company Logo Placeholder",
+          "category": "brand_logo"
+        }
+      ]
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-width-1.5"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use 'Manrope' for all headings to give a friendly, modern feel.",
+    "Use 'Inter' for all data tables and dense information.",
+    "Primary color is #46A758 (Bamboo Green). Use it for primary actions and active states.",
+    "Backgrounds should be mostly #F8FAFC (Slate-50) to keep it airy.",
+    "Cards must have a subtle border (border-slate-200) and shadow-sm.",
+    "Do not use heavy gradients. Stick to flat colors or very subtle gradients for active states.",
+    "For the 'India-First' payroll, ensure currency formatting is ₹ (INR) and date format is DD/MM/YYYY.",
+    "Use the 'Bento' grid layout for the dashboard overview.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Use Shadcn UI components but override the default radius to 'rounded-lg' or 'rounded-xl' to match the softer aesthetic.",
+    "For the sidebar, use a white background with a subtle right border. Active links should have a light green background (bg-green-50) and green text."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for headers and modals only.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use sonner for toasts"
+  ]
+}
