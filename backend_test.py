@@ -399,6 +399,24 @@ class HRMSAPITester:
         # Dashboard
         self.test_dashboard_stats()
 
+        # Onboarding flow tests
+        print("\n🎯 Testing Onboarding APIs...")
+        self.test_onboarding_status()
+        
+        # Test bulk operations
+        created_depts = self.test_onboarding_bulk_departments()
+        created_leave_types = self.test_onboarding_bulk_leave_types()
+        
+        # Use first created department for employee invitation
+        dept_id = created_depts[0]['id'] if created_depts else None
+        created_employees = self.test_onboarding_bulk_employees(dept_id)
+        
+        # Test onboarding completion
+        self.test_onboarding_complete()
+        
+        # Test onboarding skip (this will mark as completed again)
+        # self.test_onboarding_skip()  # Commented out as complete already called
+
         # Department management
         dept_id = self.test_create_department()
         self.test_get_departments()
