@@ -242,6 +242,126 @@ class HRMSAPITester:
         self.log_test("Get Attendance", success and isinstance(data, list))
         return success
 
+    def test_onboarding_status(self):
+        """Test getting onboarding status"""
+        success, data = self.make_request('GET', 'onboarding/status')
+        expected_keys = ['departments_created', 'leave_types_created', 'employees_invited', 'completed']
+        has_all_keys = all(key in data for key in expected_keys) if success else False
+        self.log_test("Onboarding Status", success and has_all_keys, 
+                     f"- Status: {data}" if success else "")
+        return success
+
+    def test_onboarding_bulk_departments(self):
+        """Test bulk creating departments via onboarding"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        departments_data = {
+            'departments': [
+                {
+                    'name': f'Engineering {timestamp}',
+                    'code': f'ENG{timestamp}',
+                    'description': 'Software development team'
+                },
+                {
+                    'name': f'HR {timestamp}',
+                    'code': f'HR{timestamp}',
+                    'description': 'Human resources team'
+                }
+            ]
+        }
+        
+        success, data = self.make_request('POST', 'onboarding/departments', departments_data, 200)
+        if success and 'departments' in data:
+            # Store created department IDs for cleanup
+            for dept in data['departments']:
+                self.created_resources['departments'].append(dept['id'])
+            self.log_test("Onboarding Bulk Departments", True, 
+                         f"- Created {len(data['departments'])} departments")
+            return data['departments']
+        else:
+            self.log_test("Onboarding Bulk Departments", False, 
+                         f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_onboarding_bulk_leave_types(self):
+        """Test bulk creating leave types via onboarding"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        leave_types_data = {
+            'leave_types': [
+                {
+                    'name': f'Casual Leave {timestamp}',
+                    'code': f'CL{timestamp}',
+                    'days_allowed': 12,
+                    'carry_forward': False,
+                    'encashable': False
+                },
+                {
+                    'name': f'Sick Leave {timestamp}',
+                    'code': f'SL{timestamp}',
+                    'days_allowed': 10,
+                    'carry_forward': False,
+                    'encashable': False
+                }
+            ]
+        }
+        
+        success, data = self.make_request('POST', 'onboarding/leave-types', leave_types_data, 200)
+        if success and 'leave_types' in data:
+            # Store created leave type IDs for cleanup
+            for lt in data['leave_types']:
+                self.created_resources['leave_types'].append(lt['id'])
+            self.log_test("Onboarding Bulk Leave Types", True, 
+                         f"- Created {len(data['leave_types'])} leave types")
+            return data['leave_types']
+        else:
+            self.log_test("Onboarding Bulk Leave Types", False, 
+                         f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_onboarding_bulk_employees(self, department_id: Optional[str] = None):
+        """Test bulk inviting employees via onboarding"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        employees_data = {
+            'employees': [
+                {
+                    'full_name': f'John Doe {timestamp}',
+                    'email': f'john.doe.{timestamp}@bambooclone.com',
+                    'designation': 'Software Engineer',
+                    'department_id': department_id
+                },
+                {
+                    'full_name': f'Jane Smith {timestamp}',
+                    'email': f'jane.smith.{timestamp}@bambooclone.com',
+                    'designation': 'HR Manager',
+                    'department_id': department_id
+                }
+            ]
+        }
+        
+        success, data = self.make_request('POST', 'onboarding/employees', employees_data, 200)
+        if success and 'employees' in data:
+            # Store created employee IDs for cleanup
+            for emp in data['employees']:
+                self.created_resources['employees'].append(emp['id'])
+            self.log_test("Onboarding Bulk Employees", True, 
+                         f"- Invited {len(data['employees'])} employees")
+            return data['employees']
+        else:
+            self.log_test("Onboarding Bulk Employees", False, 
+                         f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_onboarding_complete(self):
+        """Test completing onboarding"""
+        success, data = self.make_request('POST', 'onboarding/complete', {}, 200)
+        self.log_test("Onboarding Complete", success and data.get('completed') == True)
+        return success
+
+    def test_onboarding_skip(self):
+        """Test skipping onboarding"""
+        success, data = self.make_request('POST', 'onboarding/skip', {}, 200)
+        self.log_test("Onboarding Skip", success and data.get('completed') == True)
+        return success
+
     def cleanup_resources(self):
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
