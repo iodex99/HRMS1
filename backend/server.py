@@ -572,6 +572,167 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
         "attendance_rate": round((present_today / total_employees * 100) if total_employees > 0 else 0, 1)
     }
 
+# Onboarding Models
+class OnboardingStatus(BaseModel):
+    departments_created: bool = False
+    leave_types_created: bool = False
+    employees_invited: bool = False
+    completed: bool = False
+
+class BulkDepartmentCreate(BaseModel):
+    departments: List[DepartmentCreate]
+
+class BulkLeaveTypeCreate(BaseModel):
+    leave_types: List[LeaveTypeCreate]
+
+class EmployeeInvite(BaseModel):
+    email: EmailStr
+    full_name: str
+    department_id: Optional[str] = None
+    designation: Optional[str] = None
+
+class BulkEmployeeInvite(BaseModel):
+    employees: List[EmployeeInvite]
+
+# Onboarding Routes
+@app.get("/api/onboarding/status")
+async def get_onboarding_status(user: dict = Depends(get_current_user)):
+    """Check if user has completed onboarding"""
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    dept_count = await db.departments.count_documents(query)
+    leave_type_count = await db.leave_types.count_documents(query)
+    employee_count = await db.employees.count_documents(query)
+    
+    # Check if onboarding was explicitly completed
+    onboarding = await db.onboarding.find_one({"user_id": user.get("id")})
+    
+    return {
+        "departments_created": dept_count > 0,
+        "leave_types_created": leave_type_count > 0,
+        "employees_invited": employee_count > 0,
+        "completed": onboarding.get("completed", False) if onboarding else False,
+        "counts": {
+            "departments": dept_count,
+            "leave_types": leave_type_count,
+            "employees": employee_count
+        }
+    }
+
+@app.post("/api/onboarding/departments")
+async def create_onboarding_departments(data: BulkDepartmentCreate, user: dict = Depends(get_current_user)):
+    """Create multiple departments during onboarding"""
+    created = []
+    for dept in data.departments:
+        dept_doc = {
+            "name": dept.name,
+            "code": dept.code,
+            "description": dept.description,
+            "head_id": dept.head_id,
+            "parent_id": dept.parent_id,
+            "tenant_id": user.get("tenant_id"),
+            "created_at": datetime.now(timezone.utc),
+            "is_active": True
+        }
+        result = await db.departments.insert_one(dept_doc)
+        created.append(serialize_doc({**dept_doc, "_id": result.inserted_id}))
+    
+    return {"message": f"Created {len(created)} departments", "departments": created}
+
+@app.post("/api/onboarding/leave-types")
+async def create_onboarding_leave_types(data: BulkLeaveTypeCreate, user: dict = Depends(get_current_user)):
+    """Create multiple leave types during onboarding"""
+    created = []
+    for lt in data.leave_types:
+        lt_doc = {
+            "name": lt.name,
+            "code": lt.code,
+            "days_allowed": lt.days_allowed,
+            "carry_forward": lt.carry_forward,
+            "encashable": lt.encashable,
+            "tenant_id": user.get("tenant_id"),
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.leave_types.insert_one(lt_doc)
+        created.append(serialize_doc({**lt_doc, "_id": result.inserted_id}))
+    
+    return {"message": f"Created {len(created)} leave types", "leave_types": created}
+
+@app.post("/api/onboarding/employees")
+async def invite_onboarding_employees(data: BulkEmployeeInvite, user: dict = Depends(get_current_user)):
+    """Invite multiple employees during onboarding"""
+    created = []
+    skipped = []
+    
+    for i, emp in enumerate(data.employees):
+        # Check if employee already exists
+        existing = await db.employees.find_one({
+            "email": emp.email,
+            "tenant_id": user.get("tenant_id")
+        })
+        if existing:
+            skipped.append(emp.email)
+            continue
+        
+        emp_doc = {
+            "employee_id": f"EMP{str(i+1).zfill(4)}",
+            "full_name": emp.full_name,
+            "email": emp.email,
+            "department_id": emp.department_id,
+            "designation": emp.designation,
+            "employment_type": "full-time",
+            "status": "active",
+            "tenant_id": user.get("tenant_id"),
+            "created_at": datetime.now(timezone.utc),
+            "created_by": user.get("id"),
+            "invited": True
+        }
+        result = await db.employees.insert_one(emp_doc)
+        created.append(serialize_doc({**emp_doc, "_id": result.inserted_id}))
+    
+    return {
+        "message": f"Invited {len(created)} employees",
+        "employees": created,
+        "skipped": skipped
+    }
+
+@app.post("/api/onboarding/complete")
+async def complete_onboarding(user: dict = Depends(get_current_user)):
+    """Mark onboarding as complete"""
+    await db.onboarding.update_one(
+        {"user_id": user.get("id")},
+        {
+            "$set": {
+                "user_id": user.get("id"),
+                "tenant_id": user.get("tenant_id"),
+                "completed": True,
+                "completed_at": datetime.now(timezone.utc)
+            }
+        },
+        upsert=True
+    )
+    return {"message": "Onboarding completed", "completed": True}
+
+@app.post("/api/onboarding/skip")
+async def skip_onboarding(user: dict = Depends(get_current_user)):
+    """Skip onboarding for now"""
+    await db.onboarding.update_one(
+        {"user_id": user.get("id")},
+        {
+            "$set": {
+                "user_id": user.get("id"),
+                "tenant_id": user.get("tenant_id"),
+                "completed": True,
+                "skipped": True,
+                "completed_at": datetime.now(timezone.utc)
+            }
+        },
+        upsert=True
+    )
+    return {"message": "Onboarding skipped", "completed": True}
+
 # Seed initial super admin
 @app.on_event("startup")
 async def seed_data():
