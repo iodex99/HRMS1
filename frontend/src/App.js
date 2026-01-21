@@ -475,6 +475,58 @@ const DashboardPage = () => {
         </div>
       </div>
 
+      {/* Onboarding Banner */}
+      {onboardingStatus && !onboardingStatus.completed && (
+        <div className="mb-8 card p-6 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20" data-testid="onboarding-banner">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
+                <Briefcase className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-heading font-semibold text-lg text-slate-900">Complete Your Setup</h3>
+                <p className="text-sm text-slate-600">
+                  Get started by setting up departments, leave types, and inviting your team.
+                </p>
+              </div>
+            </div>
+            <button
+              data-testid="start-onboarding-btn"
+              onClick={() => navigate('/onboarding')}
+              className="btn-primary"
+            >
+              Start Setup
+            </button>
+          </div>
+          <div className="mt-4 flex gap-4">
+            <div className={`flex items-center gap-2 text-sm ${onboardingStatus.departments_created ? 'text-green-600' : 'text-slate-500'}`}>
+              {onboardingStatus.departments_created ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+              ) : (
+                <div className="w-4 h-4 rounded-full border-2 border-current" />
+              )}
+              Departments ({onboardingStatus.counts?.departments || 0})
+            </div>
+            <div className={`flex items-center gap-2 text-sm ${onboardingStatus.leave_types_created ? 'text-green-600' : 'text-slate-500'}`}>
+              {onboardingStatus.leave_types_created ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+              ) : (
+                <div className="w-4 h-4 rounded-full border-2 border-current" />
+              )}
+              Leave Types ({onboardingStatus.counts?.leave_types || 0})
+            </div>
+            <div className={`flex items-center gap-2 text-sm ${onboardingStatus.employees_invited ? 'text-green-600' : 'text-slate-500'}`}>
+              {onboardingStatus.employees_invited ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+              ) : (
+                <div className="w-4 h-4 rounded-full border-2 border-current" />
+              )}
+              Employees ({onboardingStatus.counts?.employees || 0})
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statCards.map((stat, i) => (
