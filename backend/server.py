@@ -8,7 +8,10 @@ from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from bson import ObjectId
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
 
 app = FastAPI(title="BambooClone HR API", version="1.0.0")
 
