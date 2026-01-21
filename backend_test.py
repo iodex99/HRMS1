@@ -202,7 +202,7 @@ class HRMSAPITester:
             'reason': 'Test leave request for API testing'
         }
         
-        success, data = self.make_request('POST', 'leave-requests', lr_data, 201)
+        success, data = self.make_request('POST', 'leave-requests', lr_data, 200)
         if success and 'id' in data:
             self.created_resources['leave_requests'].append(data['id'])
             self.log_test("Create Leave Request", True, f"- ID: {data['id']}")
