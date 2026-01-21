@@ -35,52 +35,41 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - JWT authentication
 - Clean BambooHR-style UI
 
-## What's Been Implemented (Phase 1 MVP) - Jan 2026
+## What's Been Implemented
 
-### Authentication
-- [x] User registration
-- [x] User login with JWT
-- [x] Protected routes
-- [x] Role-based access
+### Phase 1 MVP - Jan 2026
+- [x] JWT Authentication (login/register)
+- [x] Dashboard with stats overview
+- [x] Employee Management (CRUD)
+- [x] Department Management (CRUD)
+- [x] Leave Management (request/approve/reject)
+- [x] Attendance (clock in/out)
+- [x] Leave Types Configuration
+- [x] Settings page
 
-### Dashboard
-- [x] Stats overview (employees, departments, pending leaves, attendance)
-- [x] Quick actions panel
-- [x] Today's attendance status
-- [x] Clock In/Out functionality
+### Phase 2 - Quick Onboarding Wizard - Jan 2026
+- [x] Multi-step setup wizard (4 steps)
+- [x] Step 1: Bulk department creation with pre-filled defaults
+- [x] Step 2: Leave types configuration with carry forward/encash
+- [x] Step 3: Team member invitation form
+- [x] Step 4: Completion summary with stats
+- [x] Dashboard onboarding banner (shows until completed)
+- [x] Skip onboarding option
+- [x] Progress indicators and success notifications
 
-### Employee Management
-- [x] Employee directory with search
-- [x] Add new employee (full form)
-- [x] Delete employee
-- [x] Department assignment
-
-### Department Management
-- [x] Department cards view
-- [x] Add department with code
-- [x] Delete department
-
-### Leave Management
-- [x] Leave request submission
-- [x] Leave type selection
-- [x] Approve/Reject workflow (for HR/Admin)
-- [x] Leave types configuration
-
-### Attendance
-- [x] Clock In/Out
-- [x] Attendance history view
-- [x] Daily attendance status
-
-### Settings
-- [x] Leave types CRUD
-- [x] Account information display
+### Backend APIs Added
+- GET /api/onboarding/status - Check completion status
+- POST /api/onboarding/departments - Bulk create departments
+- POST /api/onboarding/leave-types - Bulk create leave types
+- POST /api/onboarding/employees - Bulk invite employees
+- POST /api/onboarding/complete - Mark onboarding complete
+- POST /api/onboarding/skip - Skip onboarding
 
 ## Prioritized Backlog
 
 ### P0 - Critical
-- [ ] Tenant onboarding flow
 - [ ] Employee profile edit
-- [ ] Leave balance tracking
+- [ ] Leave balance tracking per employee
 
 ### P1 - High Priority
 - [ ] Timesheets module (Client/Project/Task)
@@ -90,7 +79,7 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 
 ### P2 - Medium Priority
 - [ ] Hiring/ATS module
-- [ ] Onboarding checklists
+- [ ] Onboarding checklists (post-hire)
 - [ ] Performance reviews
 - [ ] Goals/OKRs
 - [ ] Expense claims
@@ -102,10 +91,10 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [ ] Reports & Analytics
 - [ ] Bulk import/export
 - [ ] Email notifications
+- [ ] Multi-tenant admin panel
 
 ## Next Tasks
 1. Add employee profile edit functionality
-2. Implement leave balance calculation
-3. Build timesheets module
-4. Add organization chart view
-5. Implement payroll structure with India compliance
+2. Implement leave balance calculation per employee
+3. Build timesheets module with project tracking
+4. Add organization chart visualization
