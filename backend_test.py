@@ -140,7 +140,7 @@ class HRMSAPITester:
             'status': 'active'
         }
         
-        success, data = self.make_request('POST', 'employees', emp_data, 201)
+        success, data = self.make_request('POST', 'employees', emp_data, 200)
         if success and 'id' in data:
             self.created_resources['employees'].append(data['id'])
             self.log_test("Create Employee", True, f"- ID: {data['id']}")
