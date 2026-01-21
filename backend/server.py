@@ -206,9 +206,7 @@ async def create_tenant(tenant: TenantCreate, user: dict = Depends(get_current_u
         "settings": {}
     }
     result = await db.tenants.insert_one(tenant_doc)
-    tenant_doc["id"] = str(result.inserted_id)
-    del tenant_doc["_id"] if "_id" in tenant_doc else None
-    return tenant_doc
+    return serialize_doc({**tenant_doc, "_id": result.inserted_id})
 
 @app.get("/api/tenants")
 async def get_tenants(user: dict = Depends(get_current_user)):
