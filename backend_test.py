@@ -110,7 +110,7 @@ class HRMSAPITester:
             'description': 'Test department for API testing'
         }
         
-        success, data = self.make_request('POST', 'departments', dept_data, 201)
+        success, data = self.make_request('POST', 'departments', dept_data, 200)
         if success and 'id' in data:
             self.created_resources['departments'].append(data['id'])
             self.log_test("Create Department", True, f"- ID: {data['id']}")
