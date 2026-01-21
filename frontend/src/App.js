@@ -1453,6 +1453,518 @@ const SettingsPage = () => {
   );
 };
 
+// Onboarding Wizard Page
+const OnboardingPage = () => {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState([
+    { name: 'Engineering', code: 'ENG', description: 'Software development team' },
+    { name: 'Human Resources', code: 'HR', description: 'People operations' },
+    { name: 'Finance', code: 'FIN', description: 'Financial operations' },
+  ]);
+  const [leaveTypes, setLeaveTypes] = useState([
+    { name: 'Casual Leave', code: 'CL', days_allowed: 12, carry_forward: false, encashable: false },
+    { name: 'Sick Leave', code: 'SL', days_allowed: 10, carry_forward: false, encashable: false },
+    { name: 'Earned Leave', code: 'EL', days_allowed: 15, carry_forward: true, encashable: true },
+  ]);
+  const [employees, setEmployees] = useState([
+    { full_name: '', email: '', designation: '', department_id: '' }
+  ]);
+  const [createdDepts, setCreatedDepts] = useState([]);
+
+  const totalSteps = 4;
+
+  const addDepartment = () => {
+    setDepartments([...departments, { name: '', code: '', description: '' }]);
+  };
+
+  const removeDepartment = (index) => {
+    if (departments.length > 1) {
+      setDepartments(departments.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateDepartment = (index, field, value) => {
+    const updated = [...departments];
+    updated[index][field] = field === 'code' ? value.toUpperCase() : value;
+    setDepartments(updated);
+  };
+
+  const addLeaveType = () => {
+    setLeaveTypes([...leaveTypes, { name: '', code: '', days_allowed: 10, carry_forward: false, encashable: false }]);
+  };
+
+  const removeLeaveType = (index) => {
+    if (leaveTypes.length > 1) {
+      setLeaveTypes(leaveTypes.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateLeaveType = (index, field, value) => {
+    const updated = [...leaveTypes];
+    updated[index][field] = field === 'code' ? value.toUpperCase() : value;
+    setLeaveTypes(updated);
+  };
+
+  const addEmployee = () => {
+    setEmployees([...employees, { full_name: '', email: '', designation: '', department_id: '' }]);
+  };
+
+  const removeEmployee = (index) => {
+    if (employees.length > 1) {
+      setEmployees(employees.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateEmployee = (index, field, value) => {
+    const updated = [...employees];
+    updated[index][field] = value;
+    setEmployees(updated);
+  };
+
+  const handleSaveDepartments = async () => {
+    const validDepts = departments.filter(d => d.name && d.code);
+    if (validDepts.length === 0) {
+      toast.error('Please add at least one department');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/onboarding/departments`, { departments: validDepts });
+      setCreatedDepts(res.data.departments);
+      toast.success(`Created ${res.data.departments.length} departments!`);
+      setStep(2);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create departments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveLeaveTypes = async () => {
+    const validTypes = leaveTypes.filter(lt => lt.name && lt.code);
+    if (validTypes.length === 0) {
+      toast.error('Please add at least one leave type');
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/onboarding/leave-types`, { leave_types: validTypes });
+      toast.success(`Created ${validTypes.length} leave types!`);
+      setStep(3);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create leave types');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInviteEmployees = async () => {
+    const validEmps = employees.filter(e => e.full_name && e.email);
+    if (validEmps.length === 0) {
+      // Skip if no employees
+      setStep(4);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/onboarding/employees`, { employees: validEmps });
+      toast.success(`Invited ${res.data.employees.length} employees!`);
+      setStep(4);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to invite employees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/onboarding/complete`);
+      toast.success('Setup complete! Welcome to BambooClone HR.');
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error('Failed to complete setup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    try {
+      await axios.post(`${API_URL}/api/onboarding/skip`);
+      navigate('/dashboard');
+    } catch (err) {
+      navigate('/dashboard');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="onboarding-page">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <span className="font-heading font-bold text-xl text-slate-900">BambooClone HR</span>
+          </div>
+          <button
+            data-testid="skip-onboarding-btn"
+            onClick={handleSkip}
+            className="text-sm text-slate-500 hover:text-slate-700"
+          >
+            Skip for now
+          </button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="bg-white border-b border-slate-100">
+        <div className="max-w-4xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Quick Setup</h2>
+            <span className="text-sm text-slate-500">Step {step} of {totalSteps}</span>
+          </div>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map((s) => (
+              <div
+                key={s}
+                className={`h-2 flex-1 rounded-full transition-colors ${
+                  s <= step ? 'bg-primary' : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between mt-3 text-xs text-slate-500">
+            <span className={step >= 1 ? 'text-primary font-medium' : ''}>Departments</span>
+            <span className={step >= 2 ? 'text-primary font-medium' : ''}>Leave Types</span>
+            <span className={step >= 3 ? 'text-primary font-medium' : ''}>Team Members</span>
+            <span className={step >= 4 ? 'text-primary font-medium' : ''}>Complete</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        {/* Step 1: Departments */}
+        {step === 1 && (
+          <div className="animate-fade-in" data-testid="onboarding-step-1">
+            <div className="text-center mb-10">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Building2 className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="font-heading text-3xl font-bold text-slate-900 mb-2">Set Up Your Departments</h1>
+              <p className="text-slate-500 max-w-lg mx-auto">
+                Create the departments in your organization. We've added some common ones to get you started.
+              </p>
+            </div>
+
+            <div className="card p-6 mb-6">
+              <div className="space-y-4">
+                {departments.map((dept, index) => (
+                  <div key={index} className="flex gap-4 items-start p-4 bg-slate-50 rounded-xl">
+                    <div className="flex-1 grid grid-cols-3 gap-4">
+                      <input
+                        data-testid={`dept-name-${index}`}
+                        type="text"
+                        placeholder="Department name"
+                        value={dept.name}
+                        onChange={(e) => updateDepartment(index, 'name', e.target.value)}
+                        className="input-field"
+                      />
+                      <input
+                        data-testid={`dept-code-${index}`}
+                        type="text"
+                        placeholder="Code"
+                        value={dept.code}
+                        onChange={(e) => updateDepartment(index, 'code', e.target.value)}
+                        className="input-field"
+                        maxLength={5}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Description (optional)"
+                        value={dept.description}
+                        onChange={(e) => updateDepartment(index, 'description', e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+                    <button
+                      onClick={() => removeDepartment(index)}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                data-testid="add-dept-btn"
+                onClick={addDepartment}
+                className="mt-4 flex items-center gap-2 text-primary hover:text-primary-600 font-medium text-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Another Department
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                data-testid="save-depts-btn"
+                onClick={handleSaveDepartments}
+                disabled={loading}
+                className="btn-primary px-8"
+              >
+                {loading ? 'Saving...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Leave Types */}
+        {step === 2 && (
+          <div className="animate-fade-in" data-testid="onboarding-step-2">
+            <div className="text-center mb-10">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <CalendarDays className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="font-heading text-3xl font-bold text-slate-900 mb-2">Configure Leave Types</h1>
+              <p className="text-slate-500 max-w-lg mx-auto">
+                Define the leave types available to your employees. Set the annual quota for each.
+              </p>
+            </div>
+
+            <div className="card p-6 mb-6">
+              <div className="space-y-4">
+                {leaveTypes.map((lt, index) => (
+                  <div key={index} className="flex gap-4 items-start p-4 bg-slate-50 rounded-xl">
+                    <div className="flex-1 grid grid-cols-4 gap-4">
+                      <input
+                        data-testid={`lt-name-${index}`}
+                        type="text"
+                        placeholder="Leave type name"
+                        value={lt.name}
+                        onChange={(e) => updateLeaveType(index, 'name', e.target.value)}
+                        className="input-field"
+                      />
+                      <input
+                        data-testid={`lt-code-${index}`}
+                        type="text"
+                        placeholder="Code"
+                        value={lt.code}
+                        onChange={(e) => updateLeaveType(index, 'code', e.target.value)}
+                        className="input-field"
+                        maxLength={4}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Days/year"
+                        value={lt.days_allowed}
+                        onChange={(e) => updateLeaveType(index, 'days_allowed', parseInt(e.target.value) || 0)}
+                        className="input-field"
+                        min={1}
+                      />
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={lt.carry_forward}
+                            onChange={(e) => updateLeaveType(index, 'carry_forward', e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary"
+                          />
+                          Carry
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={lt.encashable}
+                            onChange={(e) => updateLeaveType(index, 'encashable', e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary"
+                          />
+                          Encash
+                        </label>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeLeaveType(index)}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                data-testid="add-lt-btn"
+                onClick={addLeaveType}
+                className="mt-4 flex items-center gap-2 text-primary hover:text-primary-600 font-medium text-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Another Leave Type
+              </button>
+            </div>
+
+            <div className="flex justify-between">
+              <button onClick={() => setStep(1)} className="btn-secondary px-6">
+                Back
+              </button>
+              <button
+                data-testid="save-lt-btn"
+                onClick={handleSaveLeaveTypes}
+                disabled={loading}
+                className="btn-primary px-8"
+              >
+                {loading ? 'Saving...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Invite Employees */}
+        {step === 3 && (
+          <div className="animate-fade-in" data-testid="onboarding-step-3">
+            <div className="text-center mb-10">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-primary" />
+              </div>
+              <h1 className="font-heading text-3xl font-bold text-slate-900 mb-2">Invite Your Team</h1>
+              <p className="text-slate-500 max-w-lg mx-auto">
+                Add your first team members. You can always add more later from the Employees page.
+              </p>
+            </div>
+
+            <div className="card p-6 mb-6">
+              <div className="space-y-4">
+                {employees.map((emp, index) => (
+                  <div key={index} className="flex gap-4 items-start p-4 bg-slate-50 rounded-xl">
+                    <div className="flex-1 grid grid-cols-4 gap-4">
+                      <input
+                        data-testid={`emp-name-${index}`}
+                        type="text"
+                        placeholder="Full name"
+                        value={emp.full_name}
+                        onChange={(e) => updateEmployee(index, 'full_name', e.target.value)}
+                        className="input-field"
+                      />
+                      <input
+                        data-testid={`emp-email-${index}`}
+                        type="email"
+                        placeholder="Email"
+                        value={emp.email}
+                        onChange={(e) => updateEmployee(index, 'email', e.target.value)}
+                        className="input-field"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Job title"
+                        value={emp.designation}
+                        onChange={(e) => updateEmployee(index, 'designation', e.target.value)}
+                        className="input-field"
+                      />
+                      <select
+                        value={emp.department_id}
+                        onChange={(e) => updateEmployee(index, 'department_id', e.target.value)}
+                        className="input-field"
+                      >
+                        <option value="">Department</option>
+                        {createdDepts.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => removeEmployee(index)}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                data-testid="add-emp-btn"
+                onClick={addEmployee}
+                className="mt-4 flex items-center gap-2 text-primary hover:text-primary-600 font-medium text-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Another Employee
+              </button>
+            </div>
+
+            <div className="flex justify-between">
+              <button onClick={() => setStep(2)} className="btn-secondary px-6">
+                Back
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setStep(4)}
+                  className="btn-secondary px-6"
+                >
+                  Skip
+                </button>
+                <button
+                  data-testid="invite-emp-btn"
+                  onClick={handleInviteEmployees}
+                  disabled={loading}
+                  className="btn-primary px-8"
+                >
+                  {loading ? 'Inviting...' : 'Continue'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Complete */}
+        {step === 4 && (
+          <div className="animate-fade-in text-center" data-testid="onboarding-step-4">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="font-heading text-3xl font-bold text-slate-900 mb-3">You're All Set!</h1>
+            <p className="text-slate-500 max-w-md mx-auto mb-8">
+              Your HR system is ready to go. Start managing your team, tracking attendance, and processing leaves.
+            </p>
+
+            <div className="grid grid-cols-3 gap-6 max-w-2xl mx-auto mb-10">
+              <div className="card p-6 text-center">
+                <Building2 className="w-8 h-8 text-primary mx-auto mb-3" />
+                <p className="text-2xl font-bold text-slate-900 font-heading">{createdDepts.length}</p>
+                <p className="text-sm text-slate-500">Departments</p>
+              </div>
+              <div className="card p-6 text-center">
+                <CalendarDays className="w-8 h-8 text-primary mx-auto mb-3" />
+                <p className="text-2xl font-bold text-slate-900 font-heading">{leaveTypes.length}</p>
+                <p className="text-sm text-slate-500">Leave Types</p>
+              </div>
+              <div className="card p-6 text-center">
+                <Users className="w-8 h-8 text-primary mx-auto mb-3" />
+                <p className="text-2xl font-bold text-slate-900 font-heading">{employees.filter(e => e.full_name).length}</p>
+                <p className="text-sm text-slate-500">Team Members</p>
+              </div>
+            </div>
+
+            <button
+              data-testid="go-to-dashboard-btn"
+              onClick={handleComplete}
+              disabled={loading}
+              className="btn-primary px-10 py-3 text-lg"
+            >
+              {loading ? 'Loading...' : 'Go to Dashboard'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // Main App
 function App() {
   return (
@@ -1461,6 +1973,11 @@ function App() {
         <Toaster position="top-right" richColors />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/onboarding" element={
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          } />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={
             <ProtectedRoute>
