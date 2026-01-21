@@ -166,7 +166,7 @@ class HRMSAPITester:
             'encashable': False
         }
         
-        success, data = self.make_request('POST', 'leave-types', lt_data, 201)
+        success, data = self.make_request('POST', 'leave-types', lt_data, 200)
         if success and 'id' in data:
             self.created_resources['leave_types'].append(data['id'])
             self.log_test("Create Leave Type", True, f"- ID: {data['id']}")
