@@ -1684,6 +1684,32 @@ const SettingsPage = () => {
     }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwordFormData.new_password !== passwordFormData.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (passwordFormData.new_password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await axios.post(`${API_URL}/api/auth/change-password`, {
+        current_password: passwordFormData.current_password,
+        new_password: passwordFormData.new_password
+      });
+      toast.success('Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordFormData({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   return (
     <div data-testid="settings-page">
       <div className="mb-8">
