@@ -362,6 +362,40 @@ class HRMSAPITester:
         self.log_test("Onboarding Skip", success and data.get('completed') == True)
         return success
 
+    def test_get_email_settings(self):
+        """Test getting email configuration"""
+        success, data = self.make_request('GET', 'settings/email')
+        expected_keys = ['configured']
+        has_all_keys = all(key in data for key in expected_keys) if success else False
+        self.log_test("Get Email Settings", success and has_all_keys, 
+                     f"- Config: {data}" if success else "")
+        return success
+
+    def test_save_email_settings(self):
+        """Test saving email configuration"""
+        email_config = {
+            'smtp_email': 'test@gmail.com',
+            'smtp_password': 'testapppassword123',
+            'smtp_host': 'smtp.gmail.com',
+            'smtp_port': 587,
+            'company_name': 'Test Company'
+        }
+        
+        success, data = self.make_request('POST', 'settings/email', email_config, 200)
+        self.log_test("Save Email Settings", success and data.get('configured') == True)
+        return success
+
+    def test_email_test_endpoint(self):
+        """Test email test functionality"""
+        # This will likely fail without real SMTP credentials, but we test the endpoint
+        success, data = self.make_request('POST', 'settings/email/test', {}, expected_status=500)
+        # We expect 500 because we don't have real Gmail credentials
+        # But the endpoint should exist and return proper error
+        endpoint_exists = success or (not success and 'error' in data and 'Email error' in str(data))
+        self.log_test("Email Test Endpoint", endpoint_exists, 
+                     "- Expected failure due to test credentials")
+        return endpoint_exists
+
     def cleanup_resources(self):
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
