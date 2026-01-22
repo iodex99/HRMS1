@@ -2888,6 +2888,11 @@ function App() {
               <DashboardLayout><DashboardPage /></DashboardLayout>
             </ProtectedRoute>
           } />
+          <Route path="/my-profile" element={
+            <ProtectedRoute>
+              <DashboardLayout><MyProfilePage /></DashboardLayout>
+            </ProtectedRoute>
+          } />
           <Route path="/employees" element={
             <ProtectedRoute>
               <DashboardLayout><EmployeesPage /></DashboardLayout>
