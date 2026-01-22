@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
 class HRMSAPITester:
-    def __init__(self, base_url: str = "http://localhost:8001"):
+    def __init__(self, base_url: str = "https://hrmate-8.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
