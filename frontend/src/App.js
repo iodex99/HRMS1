@@ -495,7 +495,18 @@ const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navigation = [
+  const isEmployee = user?.role === 'employee';
+  const isHR = ['super_admin', 'admin', 'hr', 'manager'].includes(user?.role);
+
+  // Role-based navigation
+  const employeeNav = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'My Profile', href: '/my-profile', icon: UserCircle },
+    { name: 'My Attendance', href: '/attendance', icon: Clock },
+    { name: 'My Leaves', href: '/leave', icon: CalendarDays },
+  ];
+
+  const hrNav = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Employees', href: '/employees', icon: Users },
     { name: 'Departments', href: '/departments', icon: Building2 },
@@ -503,6 +514,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Leave', href: '/leave', icon: CalendarDays },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
+
+  const navigation = isEmployee ? employeeNav : hrNav;
 
   const handleLogout = () => {
     logout();
@@ -531,7 +544,9 @@ const Sidebar = ({ isOpen, onClose }) => {
           {/* Navigation */}
           <nav className="flex-1 py-6 overflow-y-auto">
             <div className="px-4 mb-2">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Main Menu</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                {isEmployee ? 'Self Service' : 'Main Menu'}
+              </p>
             </div>
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
