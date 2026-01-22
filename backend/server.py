@@ -121,6 +121,146 @@ class AttendanceCreate(BaseModel):
     check_out: Optional[str] = None
     status: str = "present"
 
+# Email Configuration Models
+class EmailConfigCreate(BaseModel):
+    smtp_email: EmailStr
+    smtp_password: str  # App Password (16 digits)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    company_name: Optional[str] = None
+
+class EmailConfigUpdate(BaseModel):
+    smtp_email: Optional[EmailStr] = None
+    smtp_password: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    company_name: Optional[str] = None
+
+# Email Helper Functions
+def generate_temp_password(length=12):
+    """Generate a secure temporary password"""
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+async def get_email_config(tenant_id: Optional[str] = None):
+    """Get email configuration for tenant"""
+    query = {"tenant_id": tenant_id} if tenant_id else {"tenant_id": None}
+    config = await db.email_config.find_one(query)
+    return config
+
+def send_welcome_email(
+    to_email: str,
+    employee_name: str,
+    temp_password: str,
+    company_name: str,
+    smtp_email: str,
+    smtp_password: str,
+    smtp_host: str = "smtp.gmail.com",
+    smtp_port: int = 587,
+    login_url: str = ""
+):
+    """Send welcome email to new employee"""
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Welcome to {company_name} - Your Account Details"
+        msg['From'] = smtp_email
+        msg['To'] = to_email
+        
+        # Plain text version
+        text = f"""
+Welcome to {company_name}!
+
+Hi {employee_name},
+
+Your HR account has been created. Here are your login details:
+
+Email: {to_email}
+Temporary Password: {temp_password}
+
+Please login and change your password immediately.
+
+Login URL: {login_url if login_url else 'Contact your HR admin for the login link'}
+
+Best regards,
+{company_name} HR Team
+        """
+        
+        # HTML version
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #334155; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 40px 20px; }}
+        .header {{ text-align: center; margin-bottom: 30px; }}
+        .logo {{ width: 60px; height: 60px; background: #46A758; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }}
+        .logo svg {{ width: 32px; height: 32px; fill: white; }}
+        h1 {{ color: #0F172A; font-size: 24px; margin: 20px 0 10px; }}
+        .card {{ background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin: 20px 0; }}
+        .credentials {{ background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 16px 0; }}
+        .label {{ font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }}
+        .value {{ font-size: 16px; font-weight: 600; color: #0F172A; margin-top: 4px; }}
+        .password {{ font-family: monospace; background: #FEF3C7; padding: 8px 12px; border-radius: 6px; display: inline-block; }}
+        .btn {{ display: inline-block; background: #46A758; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 500; margin-top: 20px; }}
+        .footer {{ text-align: center; margin-top: 30px; font-size: 14px; color: #64748B; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <h1>Welcome to {company_name}!</h1>
+            <p style="color: #64748B;">Your HR account has been created</p>
+        </div>
+        
+        <div class="card">
+            <p>Hi <strong>{employee_name}</strong>,</p>
+            <p>We're excited to have you on board! Your account has been set up in our HR system. Please use the credentials below to log in.</p>
+            
+            <div class="credentials">
+                <div style="margin-bottom: 12px;">
+                    <div class="label">Email</div>
+                    <div class="value">{to_email}</div>
+                </div>
+                <div>
+                    <div class="label">Temporary Password</div>
+                    <div class="value"><span class="password">{temp_password}</span></div>
+                </div>
+            </div>
+            
+            <p style="color: #DC2626; font-size: 14px;">⚠️ Please change your password immediately after your first login.</p>
+            
+            {f'<a href="{login_url}" class="btn">Login to Your Account</a>' if login_url else ''}
+        </div>
+        
+        <div class="footer">
+            <p>Best regards,<br><strong>{company_name} HR Team</strong></p>
+            <p style="font-size: 12px; color: #94A3B8;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
+        
+        part1 = MIMEText(text, 'plain')
+        part2 = MIMEText(html, 'html')
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Send email
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, to_email, msg.as_string())
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send email to {to_email}: {str(e)}")
+        return False
+
 # Auth helpers
 def create_access_token(data: dict):
     to_encode = data.copy()
