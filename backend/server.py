@@ -261,6 +261,117 @@ Best regards,
         print(f"Failed to send email to {to_email}: {str(e)}")
         return False
 
+def send_password_reset_email(
+    to_email: str,
+    user_name: str,
+    reset_token: str,
+    company_name: str,
+    smtp_email: str,
+    smtp_password: str,
+    smtp_host: str = "smtp.gmail.com",
+    smtp_port: int = 587,
+    reset_url: str = ""
+):
+    """Send password reset email"""
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Reset Your Password - {company_name}"
+        msg['From'] = smtp_email
+        msg['To'] = to_email
+        
+        # Build reset link
+        reset_link = f"{reset_url}?token={reset_token}" if reset_url else f"Use this token to reset: {reset_token}"
+        
+        # Plain text version
+        text = f"""
+Password Reset Request
+
+Hi {user_name},
+
+We received a request to reset your password for your {company_name} account.
+
+Click the link below to reset your password:
+{reset_link}
+
+This link will expire in 1 hour.
+
+If you didn't request this, please ignore this email.
+
+Best regards,
+{company_name} HR Team
+        """
+        
+        # HTML version
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Inter', Arial, sans-serif; line-height: 1.6; color: #334155; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 40px 20px; }}
+        .header {{ text-align: center; margin-bottom: 30px; }}
+        .logo {{ width: 60px; height: 60px; background: #46A758; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }}
+        h1 {{ color: #0F172A; font-size: 24px; margin: 20px 0 10px; }}
+        .card {{ background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; margin: 20px 0; }}
+        .btn {{ display: inline-block; background: #46A758; color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; margin: 20px 0; }}
+        .btn:hover {{ background: #16A34A; }}
+        .token {{ font-family: monospace; background: #FEF3C7; padding: 12px 16px; border-radius: 8px; display: inline-block; font-size: 18px; letter-spacing: 2px; }}
+        .warning {{ color: #DC2626; font-size: 14px; }}
+        .footer {{ text-align: center; margin-top: 30px; font-size: 14px; color: #64748B; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            </div>
+            <h1>Reset Your Password</h1>
+            <p style="color: #64748B;">We received a password reset request</p>
+        </div>
+        
+        <div class="card">
+            <p>Hi <strong>{user_name}</strong>,</p>
+            <p>We received a request to reset the password for your {company_name} account.</p>
+            
+            <div style="text-align: center;">
+                <a href="{reset_link}" class="btn">Reset Password</a>
+            </div>
+            
+            <p style="text-align: center; color: #64748B; font-size: 14px;">Or use this reset token:</p>
+            <div style="text-align: center;">
+                <span class="token">{reset_token}</span>
+            </div>
+            
+            <p class="warning" style="margin-top: 20px;">⏰ This link expires in 1 hour.</p>
+            <p style="font-size: 14px; color: #64748B;">If you didn't request this password reset, you can safely ignore this email.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Best regards,<br><strong>{company_name} HR Team</strong></p>
+            <p style="font-size: 12px; color: #94A3B8;">This is an automated message. Please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
+        
+        part1 = MIMEText(text, 'plain')
+        part2 = MIMEText(html, 'html')
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Send email
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_email, smtp_password)
+            server.sendmail(smtp_email, to_email, msg.as_string())
+        
+        return True
+    except Exception as e:
+        print(f"Failed to send password reset email to {to_email}: {str(e)}")
+        return False
+
 # Auth helpers
 def create_access_token(data: dict):
     to_encode = data.copy()
