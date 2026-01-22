@@ -572,6 +572,15 @@ class HRMSAPITester:
         self.test_save_email_settings()
         self.test_email_test_endpoint()
 
+        # Password Reset Tests
+        print("\n🔐 Testing Password Reset APIs...")
+        self.test_forgot_password_request()
+        self.test_forgot_password_invalid_email()
+        self.test_verify_reset_token_invalid()
+        self.test_reset_password_invalid_token()
+        self.test_change_password_authenticated()
+        self.test_change_password_wrong_current()
+
         # Cleanup
         self.cleanup_resources()
 
