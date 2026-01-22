@@ -768,6 +768,225 @@ async def delete_employee(emp_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Employee not found")
     return {"message": "Employee deleted"}
 
+# Employee Self-Service Routes
+class ProfileUpdate(BaseModel):
+    phone: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    address: Optional[str] = None
+    blood_group: Optional[str] = None
+    date_of_birth: Optional[str] = None
+
+@app.get("/api/me/profile")
+async def get_my_profile(user: dict = Depends(get_current_user)):
+    """Get current user's employee profile"""
+    employee = await db.employees.find_one({"email": user.get("email")})
+    if not employee:
+        # Create a basic profile for non-employee users (like super_admin)
+        return {
+            "id": user.get("id"),
+            "full_name": user.get("full_name"),
+            "email": user.get("email"),
+            "role": user.get("role"),
+            "is_employee": False
+        }
+    
+    # Get department name
+    dept = None
+    if employee.get("department_id"):
+        dept = await db.departments.find_one({"_id": ObjectId(employee["department_id"])})
+    
+    profile = serialize_doc(employee)
+    profile["department_name"] = dept.get("name") if dept else None
+    profile["is_employee"] = True
+    profile["role"] = user.get("role")
+    return profile
+
+@app.put("/api/me/profile")
+async def update_my_profile(profile: ProfileUpdate, user: dict = Depends(get_current_user)):
+    """Update current user's employee profile"""
+    employee = await db.employees.find_one({"email": user.get("email")})
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee profile not found")
+    
+    update_data = {"updated_at": datetime.now(timezone.utc)}
+    if profile.phone is not None:
+        update_data["phone"] = profile.phone
+    if profile.emergency_contact is not None:
+        update_data["emergency_contact"] = profile.emergency_contact
+    if profile.emergency_phone is not None:
+        update_data["emergency_phone"] = profile.emergency_phone
+    if profile.address is not None:
+        update_data["address"] = profile.address
+    if profile.blood_group is not None:
+        update_data["blood_group"] = profile.blood_group
+    if profile.date_of_birth is not None:
+        update_data["date_of_birth"] = profile.date_of_birth
+    
+    await db.employees.update_one({"_id": employee["_id"]}, {"$set": update_data})
+    return {"message": "Profile updated successfully"}
+
+@app.get("/api/me/leave-balance")
+async def get_my_leave_balance(user: dict = Depends(get_current_user)):
+    """Get current user's leave balance"""
+    employee = await db.employees.find_one({"email": user.get("email")})
+    
+    # Get leave types
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    leave_types = await db.leave_types.find(query).to_list(50)
+    
+    # Get approved leaves for current year
+    current_year = datetime.now().year
+    year_start = f"{current_year}-01-01"
+    year_end = f"{current_year}-12-31"
+    
+    leave_query = {
+        "user_id": user.get("id"),
+        "status": "approved",
+        "start_date": {"$gte": year_start, "$lte": year_end}
+    }
+    approved_leaves = await db.leave_requests.find(leave_query).to_list(100)
+    
+    # Calculate balance for each leave type
+    balances = []
+    for lt in leave_types:
+        lt_data = serialize_doc(lt)
+        used_days = 0
+        for leave in approved_leaves:
+            if leave.get("leave_type_id") == lt_data["id"]:
+                # Simple day calculation (can be enhanced for half days)
+                start = datetime.strptime(leave["start_date"], "%Y-%m-%d")
+                end = datetime.strptime(leave["end_date"], "%Y-%m-%d")
+                days = (end - start).days + 1
+                if leave.get("half_day"):
+                    days = 0.5
+                used_days += days
+        
+        balances.append({
+            "leave_type_id": lt_data["id"],
+            "leave_type_name": lt_data["name"],
+            "leave_type_code": lt_data["code"],
+            "total_days": lt_data["days_allowed"],
+            "used_days": used_days,
+            "remaining_days": lt_data["days_allowed"] - used_days,
+            "carry_forward": lt_data.get("carry_forward", False),
+            "encashable": lt_data.get("encashable", False)
+        })
+    
+    return {
+        "year": current_year,
+        "balances": balances
+    }
+
+@app.get("/api/me/leaves")
+async def get_my_leaves(
+    status: Optional[str] = None,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get current user's leave requests"""
+    query = {"user_id": user.get("id")}
+    if status:
+        query["status"] = status
+    if year:
+        query["start_date"] = {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}
+    
+    leaves = await db.leave_requests.find(query).sort("created_at", -1).to_list(100)
+    
+    # Enrich with leave type names
+    leave_types = await db.leave_types.find({}).to_list(50)
+    lt_map = {str(lt["_id"]): lt["name"] for lt in leave_types}
+    
+    result = []
+    for leave in leaves:
+        leave_data = serialize_doc(leave)
+        leave_data["leave_type_name"] = lt_map.get(leave_data.get("leave_type_id"), "Unknown")
+        result.append(leave_data)
+    
+    return result
+
+@app.get("/api/me/attendance")
+async def get_my_attendance(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get current user's attendance records"""
+    query = {"user_id": user.get("id")}
+    
+    if month and year:
+        month_str = f"{year}-{str(month).zfill(2)}"
+        query["date"] = {"$regex": f"^{month_str}"}
+    elif year:
+        query["date"] = {"$regex": f"^{year}"}
+    
+    records = await db.attendance.find(query).sort("date", -1).to_list(100)
+    
+    # Calculate summary
+    present_days = sum(1 for r in records if r.get("status") == "present")
+    absent_days = sum(1 for r in records if r.get("status") == "absent")
+    
+    return {
+        "records": [serialize_doc(r) for r in records],
+        "summary": {
+            "total_days": len(records),
+            "present": present_days,
+            "absent": absent_days
+        }
+    }
+
+@app.get("/api/me/dashboard")
+async def get_employee_dashboard(user: dict = Depends(get_current_user)):
+    """Get employee dashboard data"""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    
+    # Today's attendance
+    today_attendance = await db.attendance.find_one({
+        "user_id": user.get("id"),
+        "date": today
+    })
+    
+    # Pending leave requests
+    pending_leaves = await db.leave_requests.count_documents({
+        "user_id": user.get("id"),
+        "status": "pending"
+    })
+    
+    # This month's attendance
+    month_str = f"{current_year}-{str(current_month).zfill(2)}"
+    month_attendance = await db.attendance.find({
+        "user_id": user.get("id"),
+        "date": {"$regex": f"^{month_str}"}
+    }).to_list(50)
+    present_this_month = sum(1 for r in month_attendance if r.get("status") == "present")
+    
+    # Recent leaves
+    recent_leaves = await db.leave_requests.find({
+        "user_id": user.get("id")
+    }).sort("created_at", -1).limit(5).to_list(5)
+    
+    # Get leave type names
+    leave_types = await db.leave_types.find({}).to_list(50)
+    lt_map = {str(lt["_id"]): lt["name"] for lt in leave_types}
+    
+    for leave in recent_leaves:
+        leave["leave_type_name"] = lt_map.get(leave.get("leave_type_id"), "Unknown")
+    
+    # Get employee profile
+    employee = await db.employees.find_one({"email": user.get("email")})
+    
+    return {
+        "today_attendance": serialize_doc(today_attendance) if today_attendance else None,
+        "pending_leaves": pending_leaves,
+        "present_this_month": present_this_month,
+        "recent_leaves": [serialize_doc(l) for l in recent_leaves],
+        "employee": serialize_doc(employee) if employee else None
+    }
+
 # Leave Type Routes
 @app.post("/api/leave-types")
 async def create_leave_type(lt: LeaveTypeCreate, user: dict = Depends(get_current_user)):
