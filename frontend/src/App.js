@@ -1808,7 +1808,16 @@ const SettingsPage = () => {
 
         {/* User Info */}
         <div className="card p-6">
-          <h3 className="font-heading font-semibold text-lg text-slate-900 mb-4">Account Information</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-heading font-semibold text-lg text-slate-900">Account Information</h3>
+            <button
+              data-testid="change-password-btn"
+              onClick={() => setShowPasswordModal(true)}
+              className="btn-secondary text-sm"
+            >
+              Change Password
+            </button>
+          </div>
           <div className="space-y-3">
             <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
               <span className="text-slate-600">Email</span>
@@ -1821,6 +1830,68 @@ const SettingsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md" data-testid="change-password-modal">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-xl font-bold text-slate-900">Change Password</h2>
+              <button onClick={() => setShowPasswordModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Current Password</label>
+                <input
+                  data-testid="current-password-input"
+                  type="password"
+                  value={passwordFormData.current_password}
+                  onChange={(e) => setPasswordFormData({...passwordFormData, current_password: e.target.value})}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+                <input
+                  data-testid="new-password-input"
+                  type="password"
+                  value={passwordFormData.new_password}
+                  onChange={(e) => setPasswordFormData({...passwordFormData, new_password: e.target.value})}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
+                <input
+                  data-testid="confirm-new-password-input"
+                  type="password"
+                  value={passwordFormData.confirm_password}
+                  onChange={(e) => setPasswordFormData({...passwordFormData, confirm_password: e.target.value})}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" data-testid="submit-password-change-btn" className="btn-primary flex-1" disabled={changingPassword}>
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Email Configuration Modal */}
       {showEmailModal && (
