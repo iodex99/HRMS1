@@ -2089,6 +2089,272 @@ const SettingsPage = () => {
   );
 };
 
+// My Profile Page (Employee Self-Service)
+const MyProfilePage = () => {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    phone: '',
+    emergency_contact: '',
+    emergency_phone: '',
+    address: '',
+    blood_group: '',
+    date_of_birth: ''
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [profileRes, balanceRes] = await Promise.all([
+        axios.get(`${API_URL}/api/me/profile`),
+        axios.get(`${API_URL}/api/me/leave-balance`)
+      ]);
+      setProfile(profileRes.data);
+      setLeaveBalance(balanceRes.data);
+      setFormData({
+        phone: profileRes.data.phone || '',
+        emergency_contact: profileRes.data.emergency_contact || '',
+        emergency_phone: profileRes.data.emergency_phone || '',
+        address: profileRes.data.address || '',
+        blood_group: profileRes.data.blood_group || '',
+        date_of_birth: profileRes.data.date_of_birth || ''
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await axios.put(`${API_URL}/api/me/profile`, formData);
+      toast.success('Profile updated successfully!');
+      setEditing(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="my-profile-page">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-slate-900">My Profile</h1>
+          <p className="text-slate-500 mt-1">View and manage your personal information</p>
+        </div>
+        {!editing ? (
+          <button
+            data-testid="edit-profile-btn"
+            onClick={() => setEditing(true)}
+            className="btn-primary"
+          >
+            Edit Profile
+          </button>
+        ) : (
+          <div className="flex gap-3">
+            <button onClick={() => setEditing(false)} className="btn-secondary">
+              Cancel
+            </button>
+            <button
+              data-testid="save-profile-btn"
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Profile Card */}
+        <div className="card p-6">
+          <div className="text-center">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl font-bold text-primary">
+                {profile?.full_name?.charAt(0) || 'U'}
+              </span>
+            </div>
+            <h2 className="font-heading text-xl font-bold text-slate-900">{profile?.full_name}</h2>
+            <p className="text-slate-500">{profile?.designation || 'Employee'}</p>
+            <span className="badge badge-success mt-2">{profile?.status || 'Active'}</span>
+          </div>
+          <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
+            <div className="flex items-center gap-3 text-sm">
+              <Building2 className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600">{profile?.department_name || 'No Department'}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <Briefcase className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600">{profile?.employee_id || '-'}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <CalendarDays className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600">Joined {profile?.date_of_joining || '-'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Personal Information */}
+        <div className="lg:col-span-2 card p-6">
+          <h3 className="font-heading font-semibold text-lg text-slate-900 mb-6">Personal Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Email</label>
+              <p className="text-slate-900">{profile?.email}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Phone</label>
+              {editing ? (
+                <input
+                  data-testid="profile-phone-input"
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  className="input-field"
+                  placeholder="Enter phone number"
+                />
+              ) : (
+                <p className="text-slate-900">{profile?.phone || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Date of Birth</label>
+              {editing ? (
+                <input
+                  data-testid="profile-dob-input"
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({...formData, date_of_birth: e.target.value})}
+                  className="input-field"
+                />
+              ) : (
+                <p className="text-slate-900">{profile?.date_of_birth || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Blood Group</label>
+              {editing ? (
+                <select
+                  data-testid="profile-blood-select"
+                  value={formData.blood_group}
+                  onChange={(e) => setFormData({...formData, blood_group: e.target.value})}
+                  className="input-field"
+                >
+                  <option value="">Select</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => (
+                    <option key={bg} value={bg}>{bg}</option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-slate-900">{profile?.blood_group || '-'}</p>
+              )}
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-500 mb-1">Address</label>
+              {editing ? (
+                <textarea
+                  data-testid="profile-address-input"
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  className="input-field h-20"
+                  placeholder="Enter your address"
+                />
+              ) : (
+                <p className="text-slate-900">{profile?.address || '-'}</p>
+              )}
+            </div>
+          </div>
+
+          <h3 className="font-heading font-semibold text-lg text-slate-900 mt-8 mb-6">Emergency Contact</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Contact Name</label>
+              {editing ? (
+                <input
+                  data-testid="profile-emergency-name-input"
+                  type="text"
+                  value={formData.emergency_contact}
+                  onChange={(e) => setFormData({...formData, emergency_contact: e.target.value})}
+                  className="input-field"
+                  placeholder="Emergency contact name"
+                />
+              ) : (
+                <p className="text-slate-900">{profile?.emergency_contact || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">Contact Phone</label>
+              {editing ? (
+                <input
+                  data-testid="profile-emergency-phone-input"
+                  type="text"
+                  value={formData.emergency_phone}
+                  onChange={(e) => setFormData({...formData, emergency_phone: e.target.value})}
+                  className="input-field"
+                  placeholder="Emergency contact phone"
+                />
+              ) : (
+                <p className="text-slate-900">{profile?.emergency_phone || '-'}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Leave Balance */}
+      {leaveBalance && leaveBalance.balances?.length > 0 && (
+        <div className="mt-6">
+          <h3 className="font-heading font-semibold text-lg text-slate-900 mb-4">Leave Balance ({leaveBalance.year})</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {leaveBalance.balances.map((balance, i) => (
+              <div key={i} className="card p-5" data-testid={`leave-balance-${i}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="badge badge-neutral">{balance.leave_type_code}</span>
+                  {balance.carry_forward && <span className="text-xs text-slate-400">Carry Forward</span>}
+                </div>
+                <p className="font-medium text-slate-900">{balance.leave_type_name}</p>
+                <div className="mt-3 flex items-end gap-1">
+                  <span className="text-3xl font-bold text-primary font-heading">{balance.remaining_days}</span>
+                  <span className="text-slate-500 mb-1">/ {balance.total_days} days</span>
+                </div>
+                <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full"
+                    style={{ width: `${(balance.remaining_days / balance.total_days) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">Used: {balance.used_days} days</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Onboarding Wizard Page
 const OnboardingPage = () => {
   const navigate = useNavigate();
