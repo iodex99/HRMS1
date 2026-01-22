@@ -3546,6 +3546,16 @@ function App() {
               <DashboardLayout><MyProfilePage /></DashboardLayout>
             </ProtectedRoute>
           } />
+          <Route path="/timesheets" element={
+            <ProtectedRoute>
+              <DashboardLayout><TimesheetsPage /></DashboardLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/projects" element={
+            <ProtectedRoute>
+              <DashboardLayout><ProjectsPage /></DashboardLayout>
+            </ProtectedRoute>
+          } />
           <Route path="/employees" element={
             <ProtectedRoute>
               <DashboardLayout><EmployeesPage /></DashboardLayout>
