@@ -923,6 +923,120 @@ async def skip_onboarding(user: dict = Depends(get_current_user)):
     )
     return {"message": "Onboarding skipped", "completed": True}
 
+# Email Configuration Routes
+@app.get("/api/settings/email")
+async def get_email_settings(user: dict = Depends(get_current_user)):
+    """Get email configuration (password masked)"""
+    if user.get("role") not in ["super_admin", "admin", "hr"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    config = await get_email_config(user.get("tenant_id"))
+    if config:
+        return {
+            "configured": True,
+            "smtp_email": config.get("smtp_email"),
+            "smtp_host": config.get("smtp_host", "smtp.gmail.com"),
+            "smtp_port": config.get("smtp_port", 587),
+            "company_name": config.get("company_name", ""),
+            "login_url": config.get("login_url", ""),
+            "password_set": bool(config.get("smtp_password"))
+        }
+    return {"configured": False}
+
+@app.post("/api/settings/email")
+async def save_email_settings(config: EmailConfigCreate, user: dict = Depends(get_current_user)):
+    """Save email configuration"""
+    if user.get("role") not in ["super_admin", "admin", "hr"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    config_doc = {
+        "smtp_email": config.smtp_email,
+        "smtp_password": config.smtp_password,
+        "smtp_host": config.smtp_host,
+        "smtp_port": config.smtp_port,
+        "company_name": config.company_name,
+        "tenant_id": user.get("tenant_id"),
+        "updated_at": datetime.now(timezone.utc),
+        "updated_by": user.get("id")
+    }
+    
+    await db.email_config.update_one(
+        {"tenant_id": user.get("tenant_id")},
+        {"$set": config_doc},
+        upsert=True
+    )
+    
+    return {"message": "Email configuration saved", "configured": True}
+
+@app.put("/api/settings/email")
+async def update_email_settings(config: EmailConfigUpdate, user: dict = Depends(get_current_user)):
+    """Update email configuration"""
+    if user.get("role") not in ["super_admin", "admin", "hr"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_data = {"updated_at": datetime.now(timezone.utc), "updated_by": user.get("id")}
+    if config.smtp_email:
+        update_data["smtp_email"] = config.smtp_email
+    if config.smtp_password:
+        update_data["smtp_password"] = config.smtp_password
+    if config.smtp_host:
+        update_data["smtp_host"] = config.smtp_host
+    if config.smtp_port:
+        update_data["smtp_port"] = config.smtp_port
+    if config.company_name is not None:
+        update_data["company_name"] = config.company_name
+    
+    result = await db.email_config.update_one(
+        {"tenant_id": user.get("tenant_id")},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Email configuration not found")
+    
+    return {"message": "Email configuration updated"}
+
+@app.post("/api/settings/email/test")
+async def test_email_settings(user: dict = Depends(get_current_user)):
+    """Send a test email to verify configuration"""
+    if user.get("role") not in ["super_admin", "admin", "hr"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    config = await get_email_config(user.get("tenant_id"))
+    if not config:
+        raise HTTPException(status_code=400, detail="Email not configured")
+    
+    try:
+        success = send_welcome_email(
+            to_email=user.get("email"),
+            employee_name=user.get("full_name"),
+            temp_password="TEST-PASSWORD-123",
+            company_name=config.get("company_name", "BambooClone HR"),
+            smtp_email=config.get("smtp_email"),
+            smtp_password=config.get("smtp_password"),
+            smtp_host=config.get("smtp_host", "smtp.gmail.com"),
+            smtp_port=config.get("smtp_port", 587),
+            login_url=config.get("login_url", "")
+        )
+        if success:
+            return {"message": "Test email sent successfully", "sent_to": user.get("email")}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to send test email")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email error: {str(e)}")
+
+@app.delete("/api/settings/email")
+async def delete_email_settings(user: dict = Depends(get_current_user)):
+    """Delete email configuration"""
+    if user.get("role") not in ["super_admin", "admin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    result = await db.email_config.delete_one({"tenant_id": user.get("tenant_id")})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Email configuration not found")
+    
+    return {"message": "Email configuration deleted"}
+
 # Seed initial super admin
 @app.on_event("startup")
 async def seed_data():
