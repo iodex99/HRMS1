@@ -837,6 +837,22 @@ class HRMSAPITester:
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
         
+        # Delete timesheet entries
+        for entry_id in self.created_resources.get('timesheet_entries', []):
+            success, _ = self.make_request('DELETE', f'timesheets/entries/{entry_id}', expected_status=200)
+            if success:
+                print(f"   Deleted timesheet entry: {entry_id}")
+
+        # Delete tasks (no delete endpoint, so skip)
+        
+        # Delete projects (no delete endpoint in the provided code, so skip)
+        
+        # Delete clients
+        for client_id in self.created_resources.get('clients', []):
+            success, _ = self.make_request('DELETE', f'clients/{client_id}', expected_status=200)
+            if success:
+                print(f"   Deleted client: {client_id}")
+
         # Delete employees
         for emp_id in self.created_resources['employees']:
             success, _ = self.make_request('DELETE', f'employees/{emp_id}', expected_status=200)
