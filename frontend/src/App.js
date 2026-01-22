@@ -513,6 +513,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Departments', href: '/departments', icon: Building2 },
     { name: 'Timesheets', href: '/timesheets', icon: ClipboardList },
     { name: 'Projects', href: '/projects', icon: Briefcase },
+    { name: 'Reports', href: '/reports', icon: TrendingUp },
     { name: 'Attendance', href: '/attendance', icon: Clock },
     { name: 'Leave', href: '/leave', icon: CalendarDays },
     { name: 'Settings', href: '/settings', icon: Settings },
