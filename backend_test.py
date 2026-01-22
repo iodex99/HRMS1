@@ -491,6 +491,97 @@ class HRMSAPITester:
                      f"- Error: {data.get('detail', 'Unknown error')}")
         return success and error_correct
 
+    def test_get_my_profile(self):
+        """Test getting current user's profile"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('GET', 'me/profile')
+        expected_keys = ['full_name', 'email', 'role']
+        has_basic_keys = all(key in data for key in expected_keys) if success else False
+        
+        self.log_test("Get My Profile", success and has_basic_keys, 
+                     f"- Profile: {data.get('full_name', 'Unknown')} ({data.get('role', 'Unknown')})")
+        return success and has_basic_keys
+
+    def test_update_my_profile(self):
+        """Test updating current user's profile"""
+        if not self.token:
+            self.test_login()
+        
+        # First get current profile to see if user is an employee
+        success, profile_data = self.make_request('GET', 'me/profile')
+        if not success:
+            self.log_test("Update My Profile", False, "- Could not get current profile")
+            return False
+        
+        if not profile_data.get('is_employee', False):
+            self.log_test("Update My Profile", True, "- Skipped (user is not an employee)")
+            return True
+        
+        # Update profile data
+        update_data = {
+            'phone': '+1234567890',
+            'emergency_contact': 'Emergency Contact Name',
+            'emergency_phone': '+0987654321',
+            'address': '123 Test Street, Test City',
+            'blood_group': 'O+',
+            'date_of_birth': '1990-01-01'
+        }
+        
+        success, data = self.make_request('PUT', 'me/profile', update_data)
+        self.log_test("Update My Profile", success and data.get('message') == 'Profile updated successfully')
+        return success
+
+    def test_get_my_leave_balance(self):
+        """Test getting current user's leave balance"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('GET', 'me/leave-balance')
+        expected_keys = ['year', 'balances']
+        has_keys = all(key in data for key in expected_keys) if success else False
+        
+        self.log_test("Get My Leave Balance", success and has_keys, 
+                     f"- Year: {data.get('year', 'Unknown')}, Balances: {len(data.get('balances', []))}")
+        return success and has_keys
+
+    def test_get_my_leaves(self):
+        """Test getting current user's leave requests"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('GET', 'me/leaves')
+        self.log_test("Get My Leaves", success and isinstance(data, list), 
+                     f"- Found {len(data) if isinstance(data, list) else 0} leave requests")
+        return success
+
+    def test_get_my_attendance(self):
+        """Test getting current user's attendance records"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('GET', 'me/attendance')
+        expected_keys = ['records', 'summary']
+        has_keys = all(key in data for key in expected_keys) if success else False
+        
+        self.log_test("Get My Attendance", success and has_keys, 
+                     f"- Records: {len(data.get('records', []))}, Summary: {data.get('summary', {})}")
+        return success and has_keys
+
+    def test_get_employee_dashboard(self):
+        """Test getting employee dashboard data"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('GET', 'me/dashboard')
+        expected_keys = ['pending_leaves', 'present_this_month']
+        has_keys = all(key in data for key in expected_keys) if success else False
+        
+        self.log_test("Get Employee Dashboard", success and has_keys, 
+                     f"- Pending leaves: {data.get('pending_leaves', 0)}, Present this month: {data.get('present_this_month', 0)}")
+        return success and has_keys
+
     def cleanup_resources(self):
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
