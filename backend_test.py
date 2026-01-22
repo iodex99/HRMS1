@@ -948,6 +948,46 @@ class HRMSAPITester:
         self.test_get_my_attendance()
         self.test_get_employee_dashboard()
 
+        # Timesheet Module Tests
+        print("\n📊 Testing Timesheet Module APIs...")
+        
+        # Client management
+        client_id = self.test_create_client()
+        self.test_get_clients()
+        if client_id:
+            self.test_get_client_by_id(client_id)
+        
+        # Project management
+        project_id = self.test_create_project(client_id)
+        self.test_get_projects()
+        if project_id:
+            self.test_get_project_by_id(project_id)
+        
+        # Task management
+        task_id = self.test_create_task(project_id)
+        self.test_get_tasks(project_id)
+        
+        # Timesheet entry management
+        entry_id = self.test_create_timesheet_entry(project_id, task_id)
+        self.test_get_timesheet_entries()
+        self.test_get_timesheet_entries_by_week()
+        
+        # Timesheet workflow
+        self.test_submit_timesheet()
+        self.test_get_timesheet_summary()
+        self.test_get_pending_approvals()
+        
+        # Approval workflow (admin functions)
+        self.test_approve_timesheet()
+        # Note: Not testing reject as it would conflict with approve
+        
+        # Cleanup timesheet entry
+        if entry_id:
+            # First we need to test delete, but entry might be approved, so we create a new one
+            test_entry_id = self.test_create_timesheet_entry(project_id, task_id)
+            if test_entry_id:
+                self.test_delete_timesheet_entry(test_entry_id)
+
         # Cleanup
         self.cleanup_resources()
 
