@@ -1526,6 +1526,371 @@ async def get_pending_approvals(user: dict = Depends(get_current_user)):
     
     return list(pending.values())
 
+# ============== REPORTS & ANALYTICS ==============
+
+@app.get("/api/reports/dashboard")
+async def get_reports_dashboard(user: dict = Depends(get_current_user)):
+    """Get main dashboard analytics"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    # Employee stats
+    total_employees = await db.employees.count_documents({**query, "status": "active"})
+    total_departments = await db.departments.count_documents(query)
+    
+    # Today's attendance
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    present_today = await db.attendance.count_documents({**query, "date": today, "status": "present"})
+    
+    # Leave stats
+    pending_leaves = await db.leave_requests.count_documents({**query, "status": "pending"})
+    approved_leaves_month = await db.leave_requests.count_documents({
+        **query, 
+        "status": "approved",
+        "start_date": {"$gte": datetime.now().strftime("%Y-%m-01")}
+    })
+    
+    # Timesheet stats (current month)
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    month_start = f"{current_year}-{str(current_month).zfill(2)}-01"
+    
+    timesheet_entries = await db.timesheet_entries.find({
+        **query,
+        "date": {"$gte": month_start}
+    }).to_list(5000)
+    
+    total_hours = sum(e.get("hours", 0) for e in timesheet_entries)
+    billable_hours = sum(e.get("hours", 0) for e in timesheet_entries if e.get("is_billable"))
+    
+    return {
+        "employees": {
+            "total": total_employees,
+            "departments": total_departments,
+            "present_today": present_today,
+            "attendance_rate": round((present_today / total_employees * 100) if total_employees > 0 else 0, 1)
+        },
+        "leaves": {
+            "pending": pending_leaves,
+            "approved_this_month": approved_leaves_month
+        },
+        "timesheets": {
+            "total_hours_month": round(total_hours, 1),
+            "billable_hours_month": round(billable_hours, 1),
+            "billable_rate": round((billable_hours / total_hours * 100) if total_hours > 0 else 0, 1)
+        }
+    }
+
+@app.get("/api/reports/attendance")
+async def get_attendance_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    department_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get attendance analytics"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Default to current month
+    if not start_date:
+        start_date = datetime.now().strftime("%Y-%m-01")
+    if not end_date:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+    
+    query = {"date": {"$gte": start_date, "$lte": end_date}}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    records = await db.attendance.find(query).to_list(5000)
+    
+    # Get employees for department filter
+    emp_query = {}
+    if user.get("tenant_id"):
+        emp_query["tenant_id"] = user["tenant_id"]
+    if department_id:
+        emp_query["department_id"] = department_id
+    
+    employees = await db.employees.find(emp_query).to_list(500)
+    emp_ids = {str(e["_id"]): e for e in employees}
+    
+    # Daily breakdown
+    daily_stats = {}
+    for r in records:
+        date = r.get("date")
+        if date not in daily_stats:
+            daily_stats[date] = {"present": 0, "absent": 0, "late": 0}
+        daily_stats[date][r.get("status", "absent")] += 1
+    
+    # Sort by date
+    daily_data = [
+        {"date": k, **v}
+        for k, v in sorted(daily_stats.items())
+    ]
+    
+    # Employee-wise summary
+    user_stats = {}
+    for r in records:
+        uid = r.get("user_id")
+        if uid not in user_stats:
+            user_stats[uid] = {"present": 0, "absent": 0, "late": 0}
+        user_stats[uid][r.get("status", "absent")] += 1
+    
+    # Get user names
+    users = await db.users.find({}).to_list(500)
+    user_map = {str(u["_id"]): u.get("full_name", "Unknown") for u in users}
+    
+    employee_data = [
+        {
+            "user_id": uid,
+            "user_name": user_map.get(uid, "Unknown"),
+            "present": stats["present"],
+            "absent": stats["absent"],
+            "attendance_rate": round((stats["present"] / (stats["present"] + stats["absent"]) * 100) if (stats["present"] + stats["absent"]) > 0 else 0, 1)
+        }
+        for uid, stats in user_stats.items()
+    ]
+    
+    total_present = sum(d.get("present", 0) for d in daily_data)
+    total_absent = sum(d.get("absent", 0) for d in daily_data)
+    
+    return {
+        "period": {"start": start_date, "end": end_date},
+        "summary": {
+            "total_records": len(records),
+            "total_present": total_present,
+            "total_absent": total_absent,
+            "avg_attendance_rate": round((total_present / (total_present + total_absent) * 100) if (total_present + total_absent) > 0 else 0, 1)
+        },
+        "daily_breakdown": daily_data,
+        "employee_breakdown": sorted(employee_data, key=lambda x: x["attendance_rate"], reverse=True)
+    }
+
+@app.get("/api/reports/leave")
+async def get_leave_report(
+    year: Optional[int] = None,
+    department_id: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get leave analytics"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not year:
+        year = datetime.now().year
+    
+    query = {"start_date": {"$gte": f"{year}-01-01", "$lte": f"{year}-12-31"}}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    leaves = await db.leave_requests.find(query).to_list(2000)
+    
+    # Leave type breakdown
+    leave_types = await db.leave_types.find({}).to_list(50)
+    lt_map = {str(lt["_id"]): lt["name"] for lt in leave_types}
+    
+    type_breakdown = {}
+    for leave in leaves:
+        lt_id = leave.get("leave_type_id")
+        lt_name = lt_map.get(lt_id, "Unknown")
+        if lt_name not in type_breakdown:
+            type_breakdown[lt_name] = {"pending": 0, "approved": 0, "rejected": 0}
+        type_breakdown[lt_name][leave.get("status", "pending")] += 1
+    
+    type_data = [
+        {"type": k, **v, "total": v["pending"] + v["approved"] + v["rejected"]}
+        for k, v in type_breakdown.items()
+    ]
+    
+    # Monthly breakdown
+    monthly_breakdown = {}
+    for leave in leaves:
+        month = leave.get("start_date", "")[:7]  # YYYY-MM
+        if month not in monthly_breakdown:
+            monthly_breakdown[month] = {"count": 0, "approved": 0}
+        monthly_breakdown[month]["count"] += 1
+        if leave.get("status") == "approved":
+            monthly_breakdown[month]["approved"] += 1
+    
+    monthly_data = [
+        {"month": k, **v}
+        for k, v in sorted(monthly_breakdown.items())
+    ]
+    
+    total_pending = sum(1 for l in leaves if l.get("status") == "pending")
+    total_approved = sum(1 for l in leaves if l.get("status") == "approved")
+    total_rejected = sum(1 for l in leaves if l.get("status") == "rejected")
+    
+    return {
+        "year": year,
+        "summary": {
+            "total_requests": len(leaves),
+            "pending": total_pending,
+            "approved": total_approved,
+            "rejected": total_rejected,
+            "approval_rate": round((total_approved / len(leaves) * 100) if leaves else 0, 1)
+        },
+        "by_type": type_data,
+        "monthly_trend": monthly_data
+    }
+
+@app.get("/api/reports/utilization")
+async def get_utilization_report(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get team utilization and billable hours report"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not month:
+        month = datetime.now().month
+    if not year:
+        year = datetime.now().year
+    
+    month_start = f"{year}-{str(month).zfill(2)}-01"
+    if month == 12:
+        month_end = f"{year+1}-01-01"
+    else:
+        month_end = f"{year}-{str(month+1).zfill(2)}-01"
+    
+    query = {"date": {"$gte": month_start, "$lt": month_end}}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    entries = await db.timesheet_entries.find(query).to_list(5000)
+    
+    # User breakdown
+    user_hours = {}
+    for e in entries:
+        uid = e.get("user_id")
+        if uid not in user_hours:
+            user_hours[uid] = {"total": 0, "billable": 0}
+        user_hours[uid]["total"] += e.get("hours", 0)
+        if e.get("is_billable"):
+            user_hours[uid]["billable"] += e.get("hours", 0)
+    
+    # Get user names
+    users = await db.users.find({}).to_list(500)
+    user_map = {str(u["_id"]): u.get("full_name", "Unknown") for u in users}
+    
+    # Calculate working days in month (approx 22)
+    working_days = 22
+    expected_hours = working_days * 8  # 8 hours per day
+    
+    user_data = []
+    for uid, hours in user_hours.items():
+        utilization = round((hours["total"] / expected_hours * 100) if expected_hours > 0 else 0, 1)
+        billable_rate = round((hours["billable"] / hours["total"] * 100) if hours["total"] > 0 else 0, 1)
+        user_data.append({
+            "user_id": uid,
+            "user_name": user_map.get(uid, "Unknown"),
+            "total_hours": round(hours["total"], 1),
+            "billable_hours": round(hours["billable"], 1),
+            "non_billable_hours": round(hours["total"] - hours["billable"], 1),
+            "utilization": utilization,
+            "billable_rate": billable_rate
+        })
+    
+    # Sort by utilization
+    user_data = sorted(user_data, key=lambda x: x["utilization"], reverse=True)
+    
+    # Project breakdown
+    project_hours = {}
+    for e in entries:
+        pid = e.get("project_id")
+        if pid not in project_hours:
+            project_hours[pid] = {"total": 0, "billable": 0}
+        project_hours[pid]["total"] += e.get("hours", 0)
+        if e.get("is_billable"):
+            project_hours[pid]["billable"] += e.get("hours", 0)
+    
+    # Get project names
+    projects = await db.projects.find({}).to_list(200)
+    project_map = {str(p["_id"]): {"name": p["name"], "budget": p.get("budget_hours")} for p in projects}
+    
+    clients = await db.clients.find({}).to_list(100)
+    client_map = {str(c["_id"]): c["name"] for c in clients}
+    
+    project_data = []
+    for pid, hours in project_hours.items():
+        proj = project_map.get(pid, {"name": "Unknown", "budget": None})
+        budget_used = round((hours["total"] / proj["budget"] * 100) if proj["budget"] else 0, 1)
+        project_data.append({
+            "project_id": pid,
+            "project_name": proj["name"],
+            "total_hours": round(hours["total"], 1),
+            "billable_hours": round(hours["billable"], 1),
+            "budget_hours": proj["budget"],
+            "budget_used_pct": budget_used
+        })
+    
+    # Sort by hours
+    project_data = sorted(project_data, key=lambda x: x["total_hours"], reverse=True)
+    
+    total_hours = sum(h["total"] for h in user_hours.values())
+    total_billable = sum(h["billable"] for h in user_hours.values())
+    
+    return {
+        "period": {"month": month, "year": year},
+        "summary": {
+            "total_hours": round(total_hours, 1),
+            "billable_hours": round(total_billable, 1),
+            "non_billable_hours": round(total_hours - total_billable, 1),
+            "team_billable_rate": round((total_billable / total_hours * 100) if total_hours > 0 else 0, 1),
+            "avg_utilization": round(sum(u["utilization"] for u in user_data) / len(user_data) if user_data else 0, 1)
+        },
+        "by_employee": user_data,
+        "by_project": project_data[:10]  # Top 10 projects
+    }
+
+@app.get("/api/reports/department")
+async def get_department_report(user: dict = Depends(get_current_user)):
+    """Get department-wise breakdown"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    departments = await db.departments.find(query).to_list(50)
+    employees = await db.employees.find({**query, "status": "active"}).to_list(500)
+    
+    # Group employees by department
+    dept_employees = {}
+    for emp in employees:
+        dept_id = emp.get("department_id")
+        if dept_id not in dept_employees:
+            dept_employees[dept_id] = []
+        dept_employees[dept_id].append(emp)
+    
+    dept_data = []
+    for dept in departments:
+        dept_id = str(dept["_id"])
+        emps = dept_employees.get(dept_id, [])
+        dept_data.append({
+            "department_id": dept_id,
+            "department_name": dept.get("name"),
+            "code": dept.get("code"),
+            "employee_count": len(emps),
+            "employees": [{"id": str(e["_id"]), "name": e.get("full_name")} for e in emps[:5]]  # First 5
+        })
+    
+    # Sort by employee count
+    dept_data = sorted(dept_data, key=lambda x: x["employee_count"], reverse=True)
+    
+    return {
+        "total_departments": len(departments),
+        "total_employees": len(employees),
+        "departments": dept_data
+    }
+
 # Leave Type Routes
 @app.post("/api/leave-types")
 async def create_leave_type(lt: LeaveTypeCreate, user: dict = Depends(get_current_user)):
