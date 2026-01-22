@@ -121,6 +121,44 @@ class AttendanceCreate(BaseModel):
     check_out: Optional[str] = None
     status: str = "present"
 
+# Timesheet Models
+class ClientCreate(BaseModel):
+    name: str
+    code: str
+    description: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_email: Optional[str] = None
+    is_active: bool = True
+
+class ProjectCreate(BaseModel):
+    name: str
+    code: str
+    client_id: str
+    description: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget_hours: Optional[float] = None
+    is_billable: bool = True
+    is_active: bool = True
+
+class TaskCreate(BaseModel):
+    name: str
+    project_id: str
+    description: Optional[str] = None
+    is_billable: bool = True
+
+class TimesheetEntryCreate(BaseModel):
+    date: str
+    project_id: str
+    task_id: Optional[str] = None
+    hours: float
+    description: Optional[str] = None
+    is_billable: bool = True
+
+class TimesheetSubmit(BaseModel):
+    week_start: str  # YYYY-MM-DD (Monday)
+    entries: List[str]  # List of entry IDs
+
 # Email Configuration Models
 class EmailConfigCreate(BaseModel):
     smtp_email: EmailStr
