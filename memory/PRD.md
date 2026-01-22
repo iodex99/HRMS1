@@ -53,16 +53,13 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [x] Bulk department creation with pre-filled defaults
 - [x] Leave types configuration with carry forward/encash
 - [x] Team member invitation form
-- [x] Completion summary with stats
 - [x] Dashboard onboarding banner
 
 ### Phase 3 - Email Invitations - Jan 2026
-- [x] Gmail SMTP configuration via Settings page
-- [x] App Password support (16-digit codes)
+- [x] Gmail SMTP configuration via Settings
 - [x] Welcome emails with temporary passwords
 - [x] Auto-create user accounts when employees are invited
 - [x] Beautiful HTML email templates
-- [x] Background email sending (non-blocking)
 - [x] Test email functionality
 
 ### Phase 4 - Forgot Password Flow - Jan 2026
@@ -71,29 +68,41 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [x] 6-character reset token generation
 - [x] Reset Password page (/reset-password)
 - [x] Password reset email with token
-- [x] Token expiry (1 hour)
-- [x] Token verification API
 - [x] Change Password UI in Settings
-- [x] Current/New/Confirm password flow
-- [x] Email enumeration protection
 
-### Backend APIs Added (Password Reset)
-- POST /api/auth/forgot-password - Request reset email
-- POST /api/auth/reset-password - Reset with token
-- POST /api/auth/change-password - Change for logged-in users
-- GET /api/auth/verify-reset-token/{token} - Verify token
+### Phase 5 - Employee Self-Service Portal - Jan 2026
+- [x] Role-aware sidebar navigation
+- [x] My Profile page (/my-profile)
+- [x] Profile card with avatar, name, designation
+- [x] Personal Information editing (phone, DOB, blood group, address)
+- [x] Emergency Contact editing
+- [x] Leave Balance display with progress bars
+- [x] Employee dashboard with personal stats
+- [x] My Attendance view
+- [x] My Leaves view
+
+### Backend APIs Added (Self-Service)
+- GET /api/me/profile - Get my profile
+- PUT /api/me/profile - Update my profile
+- GET /api/me/leave-balance - Get my leave balance
+- GET /api/me/leaves - Get my leave requests
+- GET /api/me/attendance - Get my attendance
+- GET /api/me/dashboard - Get employee dashboard
+
+## Role-Based Navigation
+- **Employees**: Dashboard, My Profile, My Attendance, My Leaves
+- **HR/Admin**: Dashboard, Employees, Departments, Attendance, Leave, Settings
 
 ## Prioritized Backlog
 
 ### P0 - Critical
-- [ ] Employee profile edit
-- [ ] Leave balance tracking per employee
+- [ ] Timesheets module (Client/Project/Task)
 
 ### P1 - High Priority
-- [ ] Timesheets module (Client/Project/Task)
 - [ ] Organization chart visualization
 - [ ] Payroll structure setup
 - [ ] India compliance (PF, ESIC, PT, TDS)
+- [ ] Reports & Analytics
 
 ### P2 - Medium Priority
 - [ ] Hiring/ATS module
@@ -106,12 +115,12 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 ### P3 - Future
 - [ ] Workflow engine configuration UI
 - [ ] Audit logs viewer
-- [ ] Reports & Analytics
 - [ ] Bulk import/export
 - [ ] Multi-tenant admin panel
+- [ ] Mobile responsive optimization
 
 ## Next Tasks
-1. Add employee profile edit functionality
-2. Implement leave balance calculation per employee
-3. Build timesheets module with project tracking
-4. Add organization chart visualization
+1. Build timesheets module with project tracking
+2. Add organization chart visualization
+3. Implement payroll structure with India compliance
+4. Add reports and analytics dashboard
