@@ -2092,6 +2092,656 @@ const SettingsPage = () => {
   );
 };
 
+// Timesheets Page
+const TimesheetsPage = () => {
+  const { user } = useAuth();
+  const [entries, setEntries] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [weekStart, setWeekStart] = useState(() => {
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + 1);
+    return monday.toISOString().split('T')[0];
+  });
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [entryForm, setEntryForm] = useState({
+    project_id: '',
+    hours: '',
+    description: '',
+    is_billable: true
+  });
+
+  const isManager = ['super_admin', 'admin', 'hr', 'manager'].includes(user?.role);
+
+  useEffect(() => {
+    fetchData();
+  }, [weekStart]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [entriesRes, projectsRes, summaryRes] = await Promise.all([
+        axios.get(`${API_URL}/api/timesheets/entries?week_start=${weekStart}`),
+        axios.get(`${API_URL}/api/projects?active_only=true`),
+        axios.get(`${API_URL}/api/timesheets/summary?week_start=${weekStart}`)
+      ]);
+      setEntries(entriesRes.data);
+      setProjects(projectsRes.data);
+      setSummary(summaryRes.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getWeekDates = () => {
+    const dates = [];
+    const start = new Date(weekStart);
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates();
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const navigateWeek = (direction) => {
+    const current = new Date(weekStart);
+    current.setDate(current.getDate() + (direction * 7));
+    setWeekStart(current.toISOString().split('T')[0]);
+  };
+
+  const getEntriesForDate = (date) => {
+    return entries.filter(e => e.date === date);
+  };
+
+  const getTotalForDate = (date) => {
+    return getEntriesForDate(date).reduce((sum, e) => sum + (e.hours || 0), 0);
+  };
+
+  const openEntryModal = (date) => {
+    setSelectedDate(date);
+    setEntryForm({ project_id: '', hours: '', description: '', is_billable: true });
+    setShowEntryModal(true);
+  };
+
+  const handleAddEntry = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/api/timesheets/entries`, {
+        date: selectedDate,
+        project_id: entryForm.project_id,
+        hours: parseFloat(entryForm.hours),
+        description: entryForm.description,
+        is_billable: entryForm.is_billable
+      });
+      toast.success('Time entry added!');
+      setShowEntryModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to add entry');
+    }
+  };
+
+  const handleDeleteEntry = async (entryId) => {
+    if (!window.confirm('Delete this entry?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/timesheets/entries/${entryId}`);
+      toast.success('Entry deleted');
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete');
+    }
+  };
+
+  const handleSubmitWeek = async () => {
+    try {
+      await axios.post(`${API_URL}/api/timesheets/submit`, {
+        week_start: weekStart,
+        entries: entries.filter(e => e.status === 'draft').map(e => e.id)
+      });
+      toast.success('Timesheet submitted for approval!');
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to submit');
+    }
+  };
+
+  const hasDraftEntries = entries.some(e => e.status === 'draft');
+  const weekTotal = weekDates.reduce((sum, date) => sum + getTotalForDate(date), 0);
+
+  return (
+    <div data-testid="timesheets-page">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-slate-900">Timesheets</h1>
+          <p className="text-slate-500 mt-1">Track your work hours by project</p>
+        </div>
+        {hasDraftEntries && (
+          <button
+            data-testid="submit-timesheet-btn"
+            onClick={handleSubmitWeek}
+            className="btn-primary"
+          >
+            Submit Week for Approval
+          </button>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="card p-4">
+            <p className="text-sm text-slate-500">Total Hours</p>
+            <p className="text-2xl font-bold text-slate-900 font-heading">{summary.total_hours.toFixed(1)}</p>
+          </div>
+          <div className="card p-4">
+            <p className="text-sm text-slate-500">Billable Hours</p>
+            <p className="text-2xl font-bold text-green-600 font-heading">{summary.billable_hours.toFixed(1)}</p>
+          </div>
+          <div className="card p-4">
+            <p className="text-sm text-slate-500">Non-Billable</p>
+            <p className="text-2xl font-bold text-slate-600 font-heading">{summary.non_billable_hours.toFixed(1)}</p>
+          </div>
+          <div className="card p-4">
+            <p className="text-sm text-slate-500">Billable %</p>
+            <p className="text-2xl font-bold text-primary font-heading">{summary.billable_percentage}%</p>
+          </div>
+        </div>
+      )}
+
+      {/* Week Navigation */}
+      <div className="card p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigateWeek(-1)}
+            className="p-2 hover:bg-slate-100 rounded-lg"
+            data-testid="prev-week-btn"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <p className="font-semibold text-slate-900">
+              {new Date(weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(weekDates[6]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+            <p className="text-sm text-slate-500">Week Total: {weekTotal.toFixed(1)} hours</p>
+          </div>
+          <button
+            onClick={() => navigateWeek(1)}
+            className="p-2 hover:bg-slate-100 rounded-lg"
+            data-testid="next-week-btn"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Weekly Grid */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-slate-200">
+            {weekDates.map((date, i) => {
+              const dayTotal = getTotalForDate(date);
+              const isToday = date === new Date().toISOString().split('T')[0];
+              return (
+                <div
+                  key={date}
+                  className={`p-4 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-primary/5' : ''}`}
+                >
+                  <p className={`text-xs font-medium ${isToday ? 'text-primary' : 'text-slate-500'}`}>{dayNames[i]}</p>
+                  <p className={`text-lg font-semibold ${isToday ? 'text-primary' : 'text-slate-900'}`}>
+                    {new Date(date).getDate()}
+                  </p>
+                  <p className="text-sm text-slate-600 mt-1">{dayTotal.toFixed(1)}h</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-7">
+            {weekDates.map((date) => {
+              const dayEntries = getEntriesForDate(date);
+              return (
+                <div
+                  key={date}
+                  className="min-h-[200px] p-2 border-r border-slate-100 last:border-r-0 bg-white"
+                >
+                  {dayEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`p-2 mb-2 rounded-lg text-xs ${
+                        entry.status === 'approved' ? 'bg-green-50 border border-green-200' :
+                        entry.status === 'submitted' ? 'bg-blue-50 border border-blue-200' :
+                        entry.status === 'rejected' ? 'bg-red-50 border border-red-200' :
+                        'bg-slate-50 border border-slate-200'
+                      }`}
+                      data-testid={`entry-${entry.id}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-slate-700 truncate">{entry.project_name}</span>
+                        {entry.status === 'draft' && (
+                          <button
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            className="text-slate-400 hover:text-red-500 ml-1"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-slate-500 truncate">{entry.client_name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="font-semibold text-slate-900">{entry.hours}h</span>
+                        {entry.is_billable && (
+                          <span className="text-green-600">$</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => openEntryModal(date)}
+                    className="w-full p-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-primary hover:text-primary transition-colors text-xs"
+                    data-testid={`add-entry-${date}`}
+                  >
+                    + Add
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add Entry Modal */}
+      {showEntryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md" data-testid="add-entry-modal">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-heading text-xl font-bold text-slate-900">Add Time Entry</h2>
+                <p className="text-sm text-slate-500">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+              </div>
+              <button onClick={() => setShowEntryModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleAddEntry} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Project</label>
+                <select
+                  data-testid="entry-project-select"
+                  value={entryForm.project_id}
+                  onChange={(e) => setEntryForm({...entryForm, project_id: e.target.value})}
+                  className="input-field"
+                  required
+                >
+                  <option value="">Select Project</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.client_name} - {p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Hours</label>
+                <input
+                  data-testid="entry-hours-input"
+                  type="number"
+                  step="0.25"
+                  min="0.25"
+                  max="24"
+                  value={entryForm.hours}
+                  onChange={(e) => setEntryForm({...entryForm, hours: e.target.value})}
+                  className="input-field"
+                  placeholder="e.g., 2.5"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  data-testid="entry-desc-input"
+                  value={entryForm.description}
+                  onChange={(e) => setEntryForm({...entryForm, description: e.target.value})}
+                  className="input-field h-20"
+                  placeholder="What did you work on?"
+                />
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={entryForm.is_billable}
+                  onChange={(e) => setEntryForm({...entryForm, is_billable: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-300 text-primary"
+                />
+                <span className="text-sm text-slate-700">Billable</span>
+              </label>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowEntryModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" data-testid="save-entry-btn" className="btn-primary flex-1">
+                  Add Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Projects Page (Admin)
+const ProjectsPage = () => {
+  const { user } = useAuth();
+  const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [clientForm, setClientForm] = useState({ name: '', code: '', description: '' });
+  const [projectForm, setProjectForm] = useState({
+    name: '', code: '', client_id: '', description: '',
+    budget_hours: '', is_billable: true
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [clientsRes, projectsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/clients`),
+        axios.get(`${API_URL}/api/projects`)
+      ]);
+      setClients(clientsRes.data);
+      setProjects(projectsRes.data);
+    } catch (err) {
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateClient = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/api/clients`, clientForm);
+      toast.success('Client created!');
+      setShowClientModal(false);
+      setClientForm({ name: '', code: '', description: '' });
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create client');
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/api/projects`, {
+        ...projectForm,
+        budget_hours: projectForm.budget_hours ? parseFloat(projectForm.budget_hours) : null
+      });
+      toast.success('Project created!');
+      setShowProjectModal(false);
+      setProjectForm({ name: '', code: '', client_id: '', description: '', budget_hours: '', is_billable: true });
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create project');
+    }
+  };
+
+  const handleDeleteClient = async (id) => {
+    if (!window.confirm('Delete this client? This will affect all related projects.')) return;
+    try {
+      await axios.delete(`${API_URL}/api/clients/${id}`);
+      toast.success('Client deleted');
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to delete');
+    }
+  };
+
+  return (
+    <div data-testid="projects-page">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-slate-900">Projects & Clients</h1>
+          <p className="text-slate-500 mt-1">Manage clients and projects for timesheets</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            data-testid="add-client-btn"
+            onClick={() => setShowClientModal(true)}
+            className="btn-secondary"
+          >
+            Add Client
+          </button>
+          <button
+            data-testid="add-project-btn"
+            onClick={() => setShowProjectModal(true)}
+            className="btn-primary"
+          >
+            Add Project
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Clients */}
+          <div className="card p-6">
+            <h3 className="font-heading font-semibold text-lg text-slate-900 mb-4">Clients ({clients.length})</h3>
+            <div className="space-y-3">
+              {clients.map((client) => (
+                <div key={client.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg" data-testid={`client-${client.id}`}>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900">{client.name}</p>
+                      <span className="badge badge-neutral">{client.code}</span>
+                    </div>
+                    <p className="text-sm text-slate-500">{client.description || 'No description'}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteClient(client.id)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {clients.length === 0 && (
+                <p className="text-center py-8 text-slate-500">No clients yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Projects */}
+          <div className="card p-6">
+            <h3 className="font-heading font-semibold text-lg text-slate-900 mb-4">Projects ({projects.length})</h3>
+            <div className="space-y-3">
+              {projects.map((project) => (
+                <div key={project.id} className="p-4 bg-slate-50 rounded-lg" data-testid={`project-${project.id}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900">{project.name}</p>
+                      <span className="badge badge-neutral">{project.code}</span>
+                      {project.is_billable && <span className="badge badge-success">Billable</span>}
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500">{project.client_name}</p>
+                  {project.budget_hours && (
+                    <p className="text-xs text-slate-400 mt-1">Budget: {project.budget_hours} hours</p>
+                  )}
+                </div>
+              ))}
+              {projects.length === 0 && (
+                <p className="text-center py-8 text-slate-500">No projects yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Client Modal */}
+      {showClientModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md" data-testid="add-client-modal">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-xl font-bold text-slate-900">Add Client</h2>
+              <button onClick={() => setShowClientModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateClient} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Client Name</label>
+                <input
+                  data-testid="client-name-input"
+                  type="text"
+                  value={clientForm.name}
+                  onChange={(e) => setClientForm({...clientForm, name: e.target.value})}
+                  className="input-field"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Code</label>
+                <input
+                  data-testid="client-code-input"
+                  type="text"
+                  value={clientForm.code}
+                  onChange={(e) => setClientForm({...clientForm, code: e.target.value.toUpperCase()})}
+                  className="input-field"
+                  placeholder="e.g., ACME"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  value={clientForm.description}
+                  onChange={(e) => setClientForm({...clientForm, description: e.target.value})}
+                  className="input-field h-20"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowClientModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" data-testid="save-client-btn" className="btn-primary flex-1">
+                  Create Client
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Project Modal */}
+      {showProjectModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md" data-testid="add-project-modal">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-xl font-bold text-slate-900">Add Project</h2>
+              <button onClick={() => setShowProjectModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateProject} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
+                <select
+                  data-testid="project-client-select"
+                  value={projectForm.client_id}
+                  onChange={(e) => setProjectForm({...projectForm, client_id: e.target.value})}
+                  className="input-field"
+                  required
+                >
+                  <option value="">Select Client</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Project Name</label>
+                  <input
+                    data-testid="project-name-input"
+                    type="text"
+                    value={projectForm.name}
+                    onChange={(e) => setProjectForm({...projectForm, name: e.target.value})}
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Code</label>
+                  <input
+                    data-testid="project-code-input"
+                    type="text"
+                    value={projectForm.code}
+                    onChange={(e) => setProjectForm({...projectForm, code: e.target.value.toUpperCase()})}
+                    className="input-field"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Budget Hours (optional)</label>
+                <input
+                  type="number"
+                  value={projectForm.budget_hours}
+                  onChange={(e) => setProjectForm({...projectForm, budget_hours: e.target.value})}
+                  className="input-field"
+                  placeholder="e.g., 100"
+                />
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={projectForm.is_billable}
+                  onChange={(e) => setProjectForm({...projectForm, is_billable: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-300 text-primary"
+                />
+                <span className="text-sm text-slate-700">Billable Project</span>
+              </label>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowProjectModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" data-testid="save-project-btn" className="btn-primary flex-1">
+                  Create Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // My Profile Page (Employee Self-Service)
 const MyProfilePage = () => {
   const { user } = useAuth();
