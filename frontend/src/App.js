@@ -1591,8 +1591,10 @@ const SettingsPage = () => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [emailConfig, setEmailConfig] = useState(null);
   const [testingEmail, setTestingEmail] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -1606,6 +1608,11 @@ const SettingsPage = () => {
     smtp_host: 'smtp.gmail.com',
     smtp_port: 587,
     company_name: ''
+  });
+  const [passwordFormData, setPasswordFormData] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
   });
 
   useEffect(() => {
