@@ -450,6 +450,139 @@ async def login(credentials: UserLogin):
 async def get_me(user: dict = Depends(get_current_user)):
     return {"user": {k: v for k, v in user.items() if k != "password"}}
 
+# Password Reset Models
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+# Password Reset Routes
+@app.post("/api/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    """Request password reset - sends email with reset token"""
+    user = await db.users.find_one({"email": request.email})
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If an account exists with this email, you will receive a password reset link"}
+    
+    # Generate reset token (6 chars for easy typing)
+    reset_token = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    
+    # Store reset token with 1 hour expiry
+    await db.password_resets.update_one(
+        {"email": request.email},
+        {
+            "$set": {
+                "email": request.email,
+                "token": reset_token,
+                "created_at": datetime.now(timezone.utc),
+                "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+                "used": False
+            }
+        },
+        upsert=True
+    )
+    
+    # Get email config
+    email_config = await get_email_config(user.get("tenant_id"))
+    
+    if email_config:
+        background_tasks.add_task(
+            send_password_reset_email,
+            to_email=request.email,
+            user_name=user.get("full_name", "User"),
+            reset_token=reset_token,
+            company_name=email_config.get("company_name", "BambooClone HR"),
+            smtp_email=email_config.get("smtp_email"),
+            smtp_password=email_config.get("smtp_password"),
+            smtp_host=email_config.get("smtp_host", "smtp.gmail.com"),
+            smtp_port=email_config.get("smtp_port", 587),
+            reset_url=email_config.get("reset_url", "")
+        )
+    
+    return {"message": "If an account exists with this email, you will receive a password reset link"}
+
+@app.post("/api/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using token"""
+    # Find valid reset token
+    reset_record = await db.password_resets.find_one({
+        "token": request.token.upper(),
+        "used": False,
+        "expires_at": {"$gt": datetime.now(timezone.utc)}
+    })
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Update password
+    hashed_password = pwd_context.hash(request.new_password)
+    result = await db.users.update_one(
+        {"email": reset_record["email"]},
+        {
+            "$set": {
+                "password": hashed_password,
+                "must_change_password": False,
+                "password_changed_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Mark token as used
+    await db.password_resets.update_one(
+        {"_id": reset_record["_id"]},
+        {"$set": {"used": True}}
+    )
+    
+    return {"message": "Password reset successfully. You can now login with your new password."}
+
+@app.post("/api/auth/change-password")
+async def change_password(request: ChangePasswordRequest, user: dict = Depends(get_current_user)):
+    """Change password for logged-in user"""
+    # Verify current password
+    db_user = await db.users.find_one({"_id": ObjectId(user.get("id"))})
+    if not db_user or not pwd_context.verify(request.current_password, db_user["password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Update password
+    hashed_password = pwd_context.hash(request.new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(user.get("id"))},
+        {
+            "$set": {
+                "password": hashed_password,
+                "must_change_password": False,
+                "password_changed_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+    
+    return {"message": "Password changed successfully"}
+
+@app.get("/api/auth/verify-reset-token/{token}")
+async def verify_reset_token(token: str):
+    """Verify if a reset token is valid"""
+    reset_record = await db.password_resets.find_one({
+        "token": token.upper(),
+        "used": False,
+        "expires_at": {"$gt": datetime.now(timezone.utc)}
+    })
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    return {"valid": True, "email": reset_record["email"]}
+
 # Tenant Routes
 @app.post("/api/tenants")
 async def create_tenant(tenant: TenantCreate, user: dict = Depends(get_current_user)):
