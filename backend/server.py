@@ -1025,6 +1025,507 @@ async def get_employee_dashboard(user: dict = Depends(get_current_user)):
         "employee": serialize_doc(employee) if employee else None
     }
 
+# ============== TIMESHEET MODULE ==============
+
+# Client Routes
+@app.post("/api/clients")
+async def create_client(client: ClientCreate, user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    client_doc = {
+        "name": client.name,
+        "code": client.code.upper(),
+        "description": client.description,
+        "contact_person": client.contact_person,
+        "contact_email": client.contact_email,
+        "is_active": client.is_active,
+        "tenant_id": user.get("tenant_id"),
+        "created_at": datetime.now(timezone.utc),
+        "created_by": user.get("id")
+    }
+    result = await db.clients.insert_one(client_doc)
+    return serialize_doc({**client_doc, "_id": result.inserted_id})
+
+@app.get("/api/clients")
+async def get_clients(active_only: bool = False, user: dict = Depends(get_current_user)):
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    if active_only:
+        query["is_active"] = True
+    
+    clients = await db.clients.find(query).sort("name", 1).to_list(100)
+    return [serialize_doc(c) for c in clients]
+
+@app.get("/api/clients/{client_id}")
+async def get_client(client_id: str, user: dict = Depends(get_current_user)):
+    client = await db.clients.find_one({"_id": ObjectId(client_id)})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return serialize_doc(client)
+
+@app.put("/api/clients/{client_id}")
+async def update_client(client_id: str, client: ClientCreate, user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_data = {
+        "name": client.name,
+        "code": client.code.upper(),
+        "description": client.description,
+        "contact_person": client.contact_person,
+        "contact_email": client.contact_email,
+        "is_active": client.is_active,
+        "updated_at": datetime.now(timezone.utc)
+    }
+    result = await db.clients.update_one({"_id": ObjectId(client_id)}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"message": "Client updated"}
+
+@app.delete("/api/clients/{client_id}")
+async def delete_client(client_id: str, user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["super_admin", "admin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    result = await db.clients.delete_one({"_id": ObjectId(client_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"message": "Client deleted"}
+
+# Project Routes
+@app.post("/api/projects")
+async def create_project(project: ProjectCreate, user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    project_doc = {
+        "name": project.name,
+        "code": project.code.upper(),
+        "client_id": project.client_id,
+        "description": project.description,
+        "start_date": project.start_date,
+        "end_date": project.end_date,
+        "budget_hours": project.budget_hours,
+        "is_billable": project.is_billable,
+        "is_active": project.is_active,
+        "tenant_id": user.get("tenant_id"),
+        "created_at": datetime.now(timezone.utc),
+        "created_by": user.get("id")
+    }
+    result = await db.projects.insert_one(project_doc)
+    return serialize_doc({**project_doc, "_id": result.inserted_id})
+
+@app.get("/api/projects")
+async def get_projects(
+    client_id: Optional[str] = None,
+    active_only: bool = False,
+    user: dict = Depends(get_current_user)
+):
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    if client_id:
+        query["client_id"] = client_id
+    if active_only:
+        query["is_active"] = True
+    
+    projects = await db.projects.find(query).sort("name", 1).to_list(200)
+    
+    # Enrich with client names
+    clients = await db.clients.find({}).to_list(100)
+    client_map = {str(c["_id"]): c["name"] for c in clients}
+    
+    result = []
+    for p in projects:
+        p_data = serialize_doc(p)
+        p_data["client_name"] = client_map.get(p_data.get("client_id"), "Unknown")
+        result.append(p_data)
+    
+    return result
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str, user: dict = Depends(get_current_user)):
+    project = await db.projects.find_one({"_id": ObjectId(project_id)})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get client name
+    client = await db.clients.find_one({"_id": ObjectId(project.get("client_id"))})
+    p_data = serialize_doc(project)
+    p_data["client_name"] = client.get("name") if client else "Unknown"
+    
+    # Get logged hours
+    hours_agg = await db.timesheet_entries.aggregate([
+        {"$match": {"project_id": project_id}},
+        {"$group": {"_id": None, "total_hours": {"$sum": "$hours"}, "billable_hours": {"$sum": {"$cond": ["$is_billable", "$hours", 0]}}}}
+    ]).to_list(1)
+    
+    if hours_agg:
+        p_data["logged_hours"] = hours_agg[0].get("total_hours", 0)
+        p_data["billable_hours"] = hours_agg[0].get("billable_hours", 0)
+    else:
+        p_data["logged_hours"] = 0
+        p_data["billable_hours"] = 0
+    
+    return p_data
+
+@app.put("/api/projects/{project_id}")
+async def update_project(project_id: str, project: ProjectCreate, user: dict = Depends(get_current_user)):
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    update_data = {
+        "name": project.name,
+        "code": project.code.upper(),
+        "client_id": project.client_id,
+        "description": project.description,
+        "start_date": project.start_date,
+        "end_date": project.end_date,
+        "budget_hours": project.budget_hours,
+        "is_billable": project.is_billable,
+        "is_active": project.is_active,
+        "updated_at": datetime.now(timezone.utc)
+    }
+    result = await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"message": "Project updated"}
+
+# Task Routes
+@app.post("/api/tasks")
+async def create_task(task: TaskCreate, user: dict = Depends(get_current_user)):
+    task_doc = {
+        "name": task.name,
+        "project_id": task.project_id,
+        "description": task.description,
+        "is_billable": task.is_billable,
+        "tenant_id": user.get("tenant_id"),
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.tasks.insert_one(task_doc)
+    return serialize_doc({**task_doc, "_id": result.inserted_id})
+
+@app.get("/api/tasks")
+async def get_tasks(project_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    query = {}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    if project_id:
+        query["project_id"] = project_id
+    
+    tasks = await db.tasks.find(query).to_list(200)
+    return [serialize_doc(t) for t in tasks]
+
+# Timesheet Entry Routes
+@app.post("/api/timesheets/entries")
+async def create_timesheet_entry(entry: TimesheetEntryCreate, user: dict = Depends(get_current_user)):
+    # Validate hours
+    if entry.hours <= 0 or entry.hours > 24:
+        raise HTTPException(status_code=400, detail="Hours must be between 0 and 24")
+    
+    # Check if entry already exists for this date/project/user
+    existing = await db.timesheet_entries.find_one({
+        "user_id": user.get("id"),
+        "date": entry.date,
+        "project_id": entry.project_id,
+        "task_id": entry.task_id
+    })
+    
+    if existing:
+        # Update existing entry
+        await db.timesheet_entries.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {
+                "hours": entry.hours,
+                "description": entry.description,
+                "is_billable": entry.is_billable,
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
+        return serialize_doc({**existing, "hours": entry.hours, "description": entry.description})
+    
+    entry_doc = {
+        "user_id": user.get("id"),
+        "date": entry.date,
+        "project_id": entry.project_id,
+        "task_id": entry.task_id,
+        "hours": entry.hours,
+        "description": entry.description,
+        "is_billable": entry.is_billable,
+        "status": "draft",  # draft, submitted, approved, rejected
+        "tenant_id": user.get("tenant_id"),
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.timesheet_entries.insert_one(entry_doc)
+    return serialize_doc({**entry_doc, "_id": result.inserted_id})
+
+@app.get("/api/timesheets/entries")
+async def get_timesheet_entries(
+    week_start: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    query = {}
+    
+    # If not admin, only show own entries
+    if user.get("role") == "employee":
+        query["user_id"] = user.get("id")
+    elif user_id:
+        query["user_id"] = user_id
+    
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    if week_start:
+        # Get entries for the week (Mon-Sun)
+        week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+        query["date"] = {"$gte": week_start, "$lte": week_end}
+    elif start_date and end_date:
+        query["date"] = {"$gte": start_date, "$lte": end_date}
+    
+    if status:
+        query["status"] = status
+    
+    entries = await db.timesheet_entries.find(query).sort("date", 1).to_list(500)
+    
+    # Enrich with project/client names
+    projects = await db.projects.find({}).to_list(200)
+    project_map = {str(p["_id"]): p for p in projects}
+    
+    clients = await db.clients.find({}).to_list(100)
+    client_map = {str(c["_id"]): c["name"] for c in clients}
+    
+    users = await db.users.find({}).to_list(500)
+    user_map = {str(u["_id"]): u.get("full_name", "Unknown") for u in users}
+    
+    result = []
+    for e in entries:
+        e_data = serialize_doc(e)
+        project = project_map.get(e_data.get("project_id"), {})
+        e_data["project_name"] = project.get("name", "Unknown")
+        e_data["client_name"] = client_map.get(project.get("client_id"), "Unknown")
+        e_data["user_name"] = user_map.get(e_data.get("user_id"), "Unknown")
+        result.append(e_data)
+    
+    return result
+
+@app.delete("/api/timesheets/entries/{entry_id}")
+async def delete_timesheet_entry(entry_id: str, user: dict = Depends(get_current_user)):
+    entry = await db.timesheet_entries.find_one({"_id": ObjectId(entry_id)})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    # Only allow deleting own draft entries or admin can delete any
+    if entry.get("user_id") != user.get("id") and user.get("role") not in ["super_admin", "admin", "hr"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    if entry.get("status") not in ["draft", "rejected"] and user.get("role") not in ["super_admin", "admin"]:
+        raise HTTPException(status_code=400, detail="Cannot delete submitted/approved entries")
+    
+    await db.timesheet_entries.delete_one({"_id": ObjectId(entry_id)})
+    return {"message": "Entry deleted"}
+
+@app.post("/api/timesheets/submit")
+async def submit_timesheet(data: TimesheetSubmit, user: dict = Depends(get_current_user)):
+    """Submit timesheet entries for approval"""
+    week_end = (datetime.strptime(data.week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+    
+    # Get all draft entries for the week
+    entries = await db.timesheet_entries.find({
+        "user_id": user.get("id"),
+        "date": {"$gte": data.week_start, "$lte": week_end},
+        "status": "draft"
+    }).to_list(100)
+    
+    if not entries:
+        raise HTTPException(status_code=400, detail="No draft entries to submit")
+    
+    # Update status to submitted
+    entry_ids = [e["_id"] for e in entries]
+    await db.timesheet_entries.update_many(
+        {"_id": {"$in": entry_ids}},
+        {"$set": {"status": "submitted", "submitted_at": datetime.now(timezone.utc)}}
+    )
+    
+    return {"message": f"Submitted {len(entries)} entries for approval", "count": len(entries)}
+
+@app.put("/api/timesheets/approve")
+async def approve_timesheet(
+    user_id: str,
+    week_start: str,
+    user: dict = Depends(get_current_user)
+):
+    """Approve submitted timesheet entries (manager/admin only)"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+    
+    result = await db.timesheet_entries.update_many(
+        {
+            "user_id": user_id,
+            "date": {"$gte": week_start, "$lte": week_end},
+            "status": "submitted"
+        },
+        {"$set": {
+            "status": "approved",
+            "approved_by": user.get("id"),
+            "approved_at": datetime.now(timezone.utc)
+        }}
+    )
+    
+    return {"message": f"Approved {result.modified_count} entries", "count": result.modified_count}
+
+@app.put("/api/timesheets/reject")
+async def reject_timesheet(
+    user_id: str,
+    week_start: str,
+    reason: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Reject submitted timesheet entries (manager/admin only)"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+    
+    result = await db.timesheet_entries.update_many(
+        {
+            "user_id": user_id,
+            "date": {"$gte": week_start, "$lte": week_end},
+            "status": "submitted"
+        },
+        {"$set": {
+            "status": "rejected",
+            "rejected_by": user.get("id"),
+            "rejected_at": datetime.now(timezone.utc),
+            "rejection_reason": reason
+        }}
+    )
+    
+    return {"message": f"Rejected {result.modified_count} entries", "count": result.modified_count}
+
+@app.get("/api/timesheets/summary")
+async def get_timesheet_summary(
+    week_start: Optional[str] = None,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    user: dict = Depends(get_current_user)
+):
+    """Get timesheet summary for user or team"""
+    query = {}
+    
+    if user.get("role") == "employee":
+        query["user_id"] = user.get("id")
+    
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    if week_start:
+        week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+        query["date"] = {"$gte": week_start, "$lte": week_end}
+    elif month and year:
+        month_start = f"{year}-{str(month).zfill(2)}-01"
+        if month == 12:
+            month_end = f"{year+1}-01-01"
+        else:
+            month_end = f"{year}-{str(month+1).zfill(2)}-01"
+        query["date"] = {"$gte": month_start, "$lt": month_end}
+    
+    entries = await db.timesheet_entries.find(query).to_list(1000)
+    
+    total_hours = sum(e.get("hours", 0) for e in entries)
+    billable_hours = sum(e.get("hours", 0) for e in entries if e.get("is_billable"))
+    non_billable_hours = total_hours - billable_hours
+    
+    # Group by project
+    project_hours = {}
+    for e in entries:
+        pid = e.get("project_id")
+        if pid not in project_hours:
+            project_hours[pid] = {"total": 0, "billable": 0}
+        project_hours[pid]["total"] += e.get("hours", 0)
+        if e.get("is_billable"):
+            project_hours[pid]["billable"] += e.get("hours", 0)
+    
+    # Get project names
+    projects = await db.projects.find({}).to_list(200)
+    project_map = {str(p["_id"]): p["name"] for p in projects}
+    
+    by_project = [
+        {
+            "project_id": pid,
+            "project_name": project_map.get(pid, "Unknown"),
+            "total_hours": hours["total"],
+            "billable_hours": hours["billable"]
+        }
+        for pid, hours in project_hours.items()
+    ]
+    
+    # Status breakdown
+    draft_count = sum(1 for e in entries if e.get("status") == "draft")
+    submitted_count = sum(1 for e in entries if e.get("status") == "submitted")
+    approved_count = sum(1 for e in entries if e.get("status") == "approved")
+    rejected_count = sum(1 for e in entries if e.get("status") == "rejected")
+    
+    return {
+        "total_hours": total_hours,
+        "billable_hours": billable_hours,
+        "non_billable_hours": non_billable_hours,
+        "billable_percentage": round((billable_hours / total_hours * 100) if total_hours > 0 else 0, 1),
+        "by_project": by_project,
+        "status_breakdown": {
+            "draft": draft_count,
+            "submitted": submitted_count,
+            "approved": approved_count,
+            "rejected": rejected_count
+        },
+        "entry_count": len(entries)
+    }
+
+@app.get("/api/timesheets/pending-approvals")
+async def get_pending_approvals(user: dict = Depends(get_current_user)):
+    """Get pending timesheet approvals (manager/admin only)"""
+    if user.get("role") not in ["super_admin", "admin", "hr", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    query = {"status": "submitted"}
+    if user.get("tenant_id"):
+        query["tenant_id"] = user["tenant_id"]
+    
+    # Group by user and week
+    entries = await db.timesheet_entries.find(query).to_list(500)
+    
+    # Get user names
+    users = await db.users.find({}).to_list(500)
+    user_map = {str(u["_id"]): u.get("full_name", "Unknown") for u in users}
+    
+    # Group by user_id and week
+    pending = {}
+    for e in entries:
+        user_id = e.get("user_id")
+        date = datetime.strptime(e.get("date"), "%Y-%m-%d")
+        week_start = (date - timedelta(days=date.weekday())).strftime("%Y-%m-%d")
+        key = f"{user_id}_{week_start}"
+        
+        if key not in pending:
+            pending[key] = {
+                "user_id": user_id,
+                "user_name": user_map.get(user_id, "Unknown"),
+                "week_start": week_start,
+                "total_hours": 0,
+                "entry_count": 0
+            }
+        pending[key]["total_hours"] += e.get("hours", 0)
+        pending[key]["entry_count"] += 1
+    
+    return list(pending.values())
+
 # Leave Type Routes
 @app.post("/api/leave-types")
 async def create_leave_type(lt: LeaveTypeCreate, user: dict = Depends(get_current_user)):
