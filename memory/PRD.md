@@ -25,17 +25,6 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - **Auth**: JWT tokens with bcrypt password hashing
 - **Email**: Gmail SMTP with App Passwords
 
-## User Personas
-1. **Super Admin**: Platform owner, manages tenants
-2. **Company Admin/HR**: Manages company employees, departments, policies
-3. **Employee**: Self-service (attendance, leave requests, profile)
-
-## Core Requirements (Static)
-- Multi-tenant data isolation
-- Role-based access control (RBAC)
-- JWT authentication
-- Clean BambooHR-style UI
-
 ## What's Been Implemented
 
 ### Phase 1 MVP - Jan 2026
@@ -50,56 +39,63 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 
 ### Phase 2 - Quick Onboarding Wizard - Jan 2026
 - [x] Multi-step setup wizard (4 steps)
-- [x] Bulk department creation with pre-filled defaults
-- [x] Leave types configuration with carry forward/encash
-- [x] Team member invitation form
+- [x] Bulk department creation
+- [x] Leave types configuration
+- [x] Team member invitation
 - [x] Dashboard onboarding banner
 
 ### Phase 3 - Email Invitations - Jan 2026
-- [x] Gmail SMTP configuration via Settings
+- [x] Gmail SMTP configuration
 - [x] Welcome emails with temporary passwords
-- [x] Auto-create user accounts when employees are invited
-- [x] Beautiful HTML email templates
+- [x] Auto-create user accounts
 - [x] Test email functionality
 
 ### Phase 4 - Forgot Password Flow - Jan 2026
-- [x] "Forgot password?" link on login page
-- [x] Forgot Password page (/forgot-password)
-- [x] 6-character reset token generation
-- [x] Reset Password page (/reset-password)
-- [x] Password reset email with token
-- [x] Change Password UI in Settings
+- [x] Forgot password page
+- [x] 6-character reset tokens
+- [x] Password reset email
+- [x] Change password in Settings
 
 ### Phase 5 - Employee Self-Service Portal - Jan 2026
 - [x] Role-aware sidebar navigation
-- [x] My Profile page (/my-profile)
-- [x] Profile card with avatar, name, designation
-- [x] Personal Information editing (phone, DOB, blood group, address)
-- [x] Emergency Contact editing
-- [x] Leave Balance display with progress bars
-- [x] Employee dashboard with personal stats
-- [x] My Attendance view
-- [x] My Leaves view
+- [x] My Profile page with editing
+- [x] Leave balance display
+- [x] Personal info & emergency contact
 
-### Backend APIs Added (Self-Service)
-- GET /api/me/profile - Get my profile
-- PUT /api/me/profile - Update my profile
-- GET /api/me/leave-balance - Get my leave balance
-- GET /api/me/leaves - Get my leave requests
-- GET /api/me/attendance - Get my attendance
-- GET /api/me/dashboard - Get employee dashboard
+### Phase 6 - Timesheets Module - Jan 2026
+- [x] Client Management (CRUD)
+- [x] Project Management (CRUD with budget hours)
+- [x] Task creation per project
+- [x] Weekly timesheet grid view
+- [x] Time entry logging (hours, description, billable flag)
+- [x] Week navigation (prev/next)
+- [x] Summary cards (Total, Billable, Non-Billable, Billable %)
+- [x] Submit for approval workflow
+- [x] Manager approval/rejection
+- [x] Pending approvals view
+- [x] Project/client-wise hour breakdown
+
+### Backend APIs Added (Timesheets)
+- GET/POST /api/clients - Client management
+- GET/POST /api/projects - Project management
+- GET/POST /api/tasks - Task management
+- GET/POST/DELETE /api/timesheets/entries - Time entries
+- POST /api/timesheets/submit - Submit for approval
+- PUT /api/timesheets/approve - Approve entries
+- PUT /api/timesheets/reject - Reject entries
+- GET /api/timesheets/summary - Hours summary
+- GET /api/timesheets/pending-approvals - Pending list
 
 ## Role-Based Navigation
-- **Employees**: Dashboard, My Profile, My Attendance, My Leaves
-- **HR/Admin**: Dashboard, Employees, Departments, Attendance, Leave, Settings
+- **Employees**: Dashboard, My Profile, Timesheets, My Attendance, My Leaves
+- **HR/Admin**: Dashboard, Employees, Departments, Timesheets, Projects, Attendance, Leave, Settings
 
 ## Prioritized Backlog
 
 ### P0 - Critical
-- [ ] Timesheets module (Client/Project/Task)
+- [ ] Organization chart visualization
 
 ### P1 - High Priority
-- [ ] Organization chart visualization
 - [ ] Payroll structure setup
 - [ ] India compliance (PF, ESIC, PT, TDS)
 - [ ] Reports & Analytics
@@ -117,10 +113,9 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [ ] Audit logs viewer
 - [ ] Bulk import/export
 - [ ] Multi-tenant admin panel
-- [ ] Mobile responsive optimization
 
 ## Next Tasks
-1. Build timesheets module with project tracking
-2. Add organization chart visualization
-3. Implement payroll structure with India compliance
-4. Add reports and analytics dashboard
+1. Add organization chart visualization
+2. Implement payroll structure with India compliance
+3. Add reports and analytics dashboard
+4. Build expense claims module
