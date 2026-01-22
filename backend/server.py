@@ -806,10 +806,18 @@ async def create_onboarding_leave_types(data: BulkLeaveTypeCreate, user: dict = 
     return {"message": f"Created {len(created)} leave types", "leave_types": created}
 
 @app.post("/api/onboarding/employees")
-async def invite_onboarding_employees(data: BulkEmployeeInvite, user: dict = Depends(get_current_user)):
-    """Invite multiple employees during onboarding"""
+async def invite_onboarding_employees(
+    data: BulkEmployeeInvite, 
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user)
+):
+    """Invite multiple employees during onboarding and send welcome emails"""
     created = []
     skipped = []
+    emails_queued = []
+    
+    # Get email config
+    email_config = await get_email_config(user.get("tenant_id"))
     
     for i, emp in enumerate(data.employees):
         # Check if employee already exists
@@ -821,6 +829,10 @@ async def invite_onboarding_employees(data: BulkEmployeeInvite, user: dict = Dep
             skipped.append(emp.email)
             continue
         
+        # Generate temp password
+        temp_password = generate_temp_password()
+        
+        # Create employee record
         emp_doc = {
             "employee_id": f"EMP{str(i+1).zfill(4)}",
             "full_name": emp.full_name,
@@ -835,12 +847,45 @@ async def invite_onboarding_employees(data: BulkEmployeeInvite, user: dict = Dep
             "invited": True
         }
         result = await db.employees.insert_one(emp_doc)
+        
+        # Create user account for employee
+        user_exists = await db.users.find_one({"email": emp.email})
+        if not user_exists:
+            await db.users.insert_one({
+                "email": emp.email,
+                "password": pwd_context.hash(temp_password),
+                "full_name": emp.full_name,
+                "role": "employee",
+                "tenant_id": user.get("tenant_id"),
+                "created_at": datetime.now(timezone.utc),
+                "is_active": True,
+                "must_change_password": True
+            })
+        
         created.append(serialize_doc({**emp_doc, "_id": result.inserted_id}))
+        
+        # Queue welcome email if config exists
+        if email_config:
+            background_tasks.add_task(
+                send_welcome_email,
+                to_email=emp.email,
+                employee_name=emp.full_name,
+                temp_password=temp_password,
+                company_name=email_config.get("company_name", "BambooClone HR"),
+                smtp_email=email_config.get("smtp_email"),
+                smtp_password=email_config.get("smtp_password"),
+                smtp_host=email_config.get("smtp_host", "smtp.gmail.com"),
+                smtp_port=email_config.get("smtp_port", 587),
+                login_url=email_config.get("login_url", "")
+            )
+            emails_queued.append(emp.email)
     
     return {
         "message": f"Invited {len(created)} employees",
         "employees": created,
-        "skipped": skipped
+        "skipped": skipped,
+        "emails_queued": emails_queued,
+        "email_configured": email_config is not None
     }
 
 @app.post("/api/onboarding/complete")
