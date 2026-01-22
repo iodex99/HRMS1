@@ -396,6 +396,101 @@ class HRMSAPITester:
                      "- Expected failure due to test credentials")
         return endpoint_exists
 
+    def test_forgot_password_request(self, email: str = "admin@bambooclone.com"):
+        """Test forgot password request"""
+        success, data = self.make_request('POST', 'auth/forgot-password', {
+            'email': email
+        }, 200)
+        
+        # Should always return success message to prevent email enumeration
+        expected_message = "If an account exists with this email, you will receive a password reset link"
+        message_correct = data.get('message') == expected_message if success else False
+        
+        self.log_test("Forgot Password Request", success and message_correct, 
+                     f"- Email: {email}")
+        return success and message_correct
+
+    def test_forgot_password_invalid_email(self):
+        """Test forgot password with invalid email"""
+        success, data = self.make_request('POST', 'auth/forgot-password', {
+            'email': 'nonexistent@example.com'
+        }, 200)
+        
+        # Should still return success message to prevent email enumeration
+        expected_message = "If an account exists with this email, you will receive a password reset link"
+        message_correct = data.get('message') == expected_message if success else False
+        
+        self.log_test("Forgot Password Invalid Email", success and message_correct, 
+                     "- Should not reveal if email exists")
+        return success and message_correct
+
+    def test_verify_reset_token_invalid(self):
+        """Test verifying an invalid reset token"""
+        success, data = self.make_request('GET', 'auth/verify-reset-token/INVALID', expected_status=400)
+        
+        # Should return 400 for invalid token
+        self.log_test("Verify Invalid Reset Token", success, 
+                     f"- Error: {data.get('detail', 'Unknown error')}")
+        return success
+
+    def test_reset_password_invalid_token(self):
+        """Test reset password with invalid token"""
+        success, data = self.make_request('POST', 'auth/reset-password', {
+            'token': 'INVALID',
+            'new_password': 'newpassword123'
+        }, 400)
+        
+        # Should return 400 for invalid token
+        expected_error = "Invalid or expired reset token"
+        error_correct = data.get('detail') == expected_error if success else False
+        
+        self.log_test("Reset Password Invalid Token", success and error_correct, 
+                     f"- Error: {data.get('detail', 'Unknown error')}")
+        return success and error_correct
+
+    def test_change_password_authenticated(self):
+        """Test changing password for authenticated user"""
+        # First ensure we're logged in
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('POST', 'auth/change-password', {
+            'current_password': 'admin123',
+            'new_password': 'newadmin123'
+        }, 200)
+        
+        if success and data.get('message') == 'Password changed successfully':
+            # Change it back to original
+            success2, data2 = self.make_request('POST', 'auth/change-password', {
+                'current_password': 'newadmin123',
+                'new_password': 'admin123'
+            }, 200)
+            
+            self.log_test("Change Password Authenticated", success and success2, 
+                         "- Password changed and reverted")
+            return success and success2
+        else:
+            self.log_test("Change Password Authenticated", False, 
+                         f"- {data.get('detail', 'Unknown error')}")
+            return False
+
+    def test_change_password_wrong_current(self):
+        """Test changing password with wrong current password"""
+        if not self.token:
+            self.test_login()
+        
+        success, data = self.make_request('POST', 'auth/change-password', {
+            'current_password': 'wrongpassword',
+            'new_password': 'newpassword123'
+        }, 400)
+        
+        expected_error = "Current password is incorrect"
+        error_correct = data.get('detail') == expected_error if success else False
+        
+        self.log_test("Change Password Wrong Current", success and error_correct, 
+                     f"- Error: {data.get('detail', 'Unknown error')}")
+        return success and error_correct
+
     def cleanup_resources(self):
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
