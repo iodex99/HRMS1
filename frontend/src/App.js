@@ -502,6 +502,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const employeeNav = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'My Profile', href: '/my-profile', icon: UserCircle },
+    { name: 'Timesheets', href: '/timesheets', icon: ClipboardList },
     { name: 'My Attendance', href: '/attendance', icon: Clock },
     { name: 'My Leaves', href: '/leave', icon: CalendarDays },
   ];
@@ -510,6 +511,8 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Employees', href: '/employees', icon: Users },
     { name: 'Departments', href: '/departments', icon: Building2 },
+    { name: 'Timesheets', href: '/timesheets', icon: ClipboardList },
+    { name: 'Projects', href: '/projects', icon: Briefcase },
     { name: 'Attendance', href: '/attendance', icon: Clock },
     { name: 'Leave', href: '/leave', icon: CalendarDays },
     { name: 'Settings', href: '/settings', icon: Settings },
