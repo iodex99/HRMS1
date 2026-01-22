@@ -672,6 +672,15 @@ class HRMSAPITester:
         self.test_change_password_authenticated()
         self.test_change_password_wrong_current()
 
+        # Employee Self-Service Tests
+        print("\n👤 Testing Employee Self-Service APIs...")
+        self.test_get_my_profile()
+        self.test_update_my_profile()
+        self.test_get_my_leave_balance()
+        self.test_get_my_leaves()
+        self.test_get_my_attendance()
+        self.test_get_employee_dashboard()
+
         # Cleanup
         self.cleanup_resources()
 
