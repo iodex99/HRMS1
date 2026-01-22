@@ -23,6 +23,7 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - **Backend**: FastAPI (Python) with Motor (async MongoDB)
 - **Database**: MongoDB with tenant isolation via tenant_id
 - **Auth**: JWT tokens with bcrypt password hashing
+- **Email**: Gmail SMTP with App Passwords
 
 ## User Personas
 1. **Super Admin**: Platform owner, manages tenants
@@ -57,19 +58,30 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [x] Skip onboarding option
 - [x] Progress indicators and success notifications
 
+### Phase 3 - Email Invitations - Jan 2026
+- [x] Gmail SMTP configuration via Settings page
+- [x] App Password support (16-digit codes)
+- [x] Company name branding in emails
+- [x] Instructions for generating Gmail App Password
+- [x] Test email functionality
+- [x] Welcome emails with temporary passwords
+- [x] Auto-create user accounts when employees are invited
+- [x] Beautiful HTML email templates
+- [x] Background email sending (non-blocking)
+
 ### Backend APIs Added
-- GET /api/onboarding/status - Check completion status
-- POST /api/onboarding/departments - Bulk create departments
-- POST /api/onboarding/leave-types - Bulk create leave types
-- POST /api/onboarding/employees - Bulk invite employees
-- POST /api/onboarding/complete - Mark onboarding complete
-- POST /api/onboarding/skip - Skip onboarding
+- GET /api/settings/email - Get email config status
+- POST /api/settings/email - Save email configuration
+- PUT /api/settings/email - Update email configuration  
+- POST /api/settings/email/test - Send test email
+- DELETE /api/settings/email - Remove email config
 
 ## Prioritized Backlog
 
 ### P0 - Critical
 - [ ] Employee profile edit
 - [ ] Leave balance tracking per employee
+- [ ] Password change for invited employees
 
 ### P1 - High Priority
 - [ ] Timesheets module (Client/Project/Task)
@@ -90,11 +102,11 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [ ] Audit logs viewer
 - [ ] Reports & Analytics
 - [ ] Bulk import/export
-- [ ] Email notifications
+- [ ] Password reset via email
 - [ ] Multi-tenant admin panel
 
 ## Next Tasks
 1. Add employee profile edit functionality
 2. Implement leave balance calculation per employee
-3. Build timesheets module with project tracking
-4. Add organization chart visualization
+3. Add password change flow for new employees
+4. Build timesheets module with project tracking
