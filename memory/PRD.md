@@ -50,38 +50,44 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 
 ### Phase 2 - Quick Onboarding Wizard - Jan 2026
 - [x] Multi-step setup wizard (4 steps)
-- [x] Step 1: Bulk department creation with pre-filled defaults
-- [x] Step 2: Leave types configuration with carry forward/encash
-- [x] Step 3: Team member invitation form
-- [x] Step 4: Completion summary with stats
-- [x] Dashboard onboarding banner (shows until completed)
-- [x] Skip onboarding option
-- [x] Progress indicators and success notifications
+- [x] Bulk department creation with pre-filled defaults
+- [x] Leave types configuration with carry forward/encash
+- [x] Team member invitation form
+- [x] Completion summary with stats
+- [x] Dashboard onboarding banner
 
 ### Phase 3 - Email Invitations - Jan 2026
 - [x] Gmail SMTP configuration via Settings page
 - [x] App Password support (16-digit codes)
-- [x] Company name branding in emails
-- [x] Instructions for generating Gmail App Password
-- [x] Test email functionality
 - [x] Welcome emails with temporary passwords
 - [x] Auto-create user accounts when employees are invited
 - [x] Beautiful HTML email templates
 - [x] Background email sending (non-blocking)
+- [x] Test email functionality
 
-### Backend APIs Added
-- GET /api/settings/email - Get email config status
-- POST /api/settings/email - Save email configuration
-- PUT /api/settings/email - Update email configuration  
-- POST /api/settings/email/test - Send test email
-- DELETE /api/settings/email - Remove email config
+### Phase 4 - Forgot Password Flow - Jan 2026
+- [x] "Forgot password?" link on login page
+- [x] Forgot Password page (/forgot-password)
+- [x] 6-character reset token generation
+- [x] Reset Password page (/reset-password)
+- [x] Password reset email with token
+- [x] Token expiry (1 hour)
+- [x] Token verification API
+- [x] Change Password UI in Settings
+- [x] Current/New/Confirm password flow
+- [x] Email enumeration protection
+
+### Backend APIs Added (Password Reset)
+- POST /api/auth/forgot-password - Request reset email
+- POST /api/auth/reset-password - Reset with token
+- POST /api/auth/change-password - Change for logged-in users
+- GET /api/auth/verify-reset-token/{token} - Verify token
 
 ## Prioritized Backlog
 
 ### P0 - Critical
 - [ ] Employee profile edit
 - [ ] Leave balance tracking per employee
-- [ ] Password change for invited employees
 
 ### P1 - High Priority
 - [ ] Timesheets module (Client/Project/Task)
@@ -102,11 +108,10 @@ Target: Small/mid-size companies, professional firms, India-first organizations
 - [ ] Audit logs viewer
 - [ ] Reports & Analytics
 - [ ] Bulk import/export
-- [ ] Password reset via email
 - [ ] Multi-tenant admin panel
 
 ## Next Tasks
 1. Add employee profile edit functionality
 2. Implement leave balance calculation per employee
-3. Add password change flow for new employees
-4. Build timesheets module with project tracking
+3. Build timesheets module with project tracking
+4. Add organization chart visualization
