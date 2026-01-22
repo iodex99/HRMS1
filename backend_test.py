@@ -471,6 +471,12 @@ class HRMSAPITester:
         self.test_clock_out()
         self.test_get_attendance()
 
+        # Email Configuration Tests
+        print("\n📧 Testing Email Configuration APIs...")
+        self.test_get_email_settings()
+        self.test_save_email_settings()
+        self.test_email_test_endpoint()
+
         # Cleanup
         self.cleanup_resources()
 
