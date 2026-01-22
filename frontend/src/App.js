@@ -204,6 +204,17 @@ const LoginPage = () => {
                   required
                 />
               </div>
+              {!isRegister && (
+                <div className="text-right">
+                  <Link
+                    to="/forgot-password"
+                    data-testid="forgot-password-link"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
               <button
                 data-testid="login-submit-btn"
                 type="submit"
@@ -229,6 +240,248 @@ const LoginPage = () => {
                 Demo: admin@bambooclone.com / admin123
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Forgot Password Page
+const ForgotPasswordPage = () => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
+      setSubmitted(true);
+      toast.success('Check your email for reset instructions');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-8">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+          </div>
+          <h1 className="font-heading text-2xl font-bold text-slate-900">Forgot Password?</h1>
+          <p className="text-slate-500 mt-2">No worries, we'll send you reset instructions</p>
+        </div>
+
+        <div className="card p-8" data-testid="forgot-password-page">
+          {!submitted ? (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+                <input
+                  data-testid="forgot-email-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-field"
+                  placeholder="you@company.com"
+                  required
+                />
+              </div>
+              <button
+                data-testid="forgot-submit-btn"
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full h-12 text-base"
+              >
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </button>
+            </form>
+          ) : (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-slate-900 mb-2">Check your email</h3>
+              <p className="text-slate-500 text-sm mb-6">
+                We sent a password reset link to<br />
+                <strong className="text-slate-700">{email}</strong>
+              </p>
+              <button
+                onClick={() => navigate('/reset-password')}
+                className="btn-primary w-full"
+                data-testid="enter-token-btn"
+              >
+                Enter Reset Token
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <Link to="/login" className="text-sm text-primary hover:underline flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to login
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Reset Password Page
+const ResetPasswordPage = () => {
+  const [token, setToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for token in URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      setToken(urlToken);
+    }
+  }, [location]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/auth/reset-password`, {
+        token: token,
+        new_password: newPassword
+      });
+      setSuccess(true);
+      toast.success('Password reset successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-8">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h1 className="font-heading text-2xl font-bold text-slate-900">Reset Password</h1>
+          <p className="text-slate-500 mt-2">Enter your reset token and new password</p>
+        </div>
+
+        <div className="card p-8" data-testid="reset-password-page">
+          {!success ? (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Reset Token</label>
+                <input
+                  data-testid="reset-token-input"
+                  type="text"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value.toUpperCase())}
+                  className="input-field font-mono text-center text-lg tracking-widest"
+                  placeholder="XXXXXX"
+                  maxLength={6}
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1">Enter the 6-character code from your email</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">New Password</label>
+                <input
+                  data-testid="reset-new-password-input"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Confirm Password</label>
+                <input
+                  data-testid="reset-confirm-password-input"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <button
+                data-testid="reset-submit-btn"
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full h-12 text-base"
+              >
+                {loading ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </form>
+          ) : (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="font-heading text-lg font-semibold text-slate-900 mb-2">Password Reset!</h3>
+              <p className="text-slate-500 text-sm mb-6">
+                Your password has been reset successfully.<br />
+                You can now login with your new password.
+              </p>
+              <button
+                onClick={() => navigate('/login')}
+                className="btn-primary w-full"
+                data-testid="go-to-login-btn"
+              >
+                Go to Login
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <Link to="/login" className="text-sm text-primary hover:underline flex items-center justify-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to login
+            </Link>
           </div>
         </div>
       </div>
