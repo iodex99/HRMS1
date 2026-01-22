@@ -1337,6 +1337,9 @@ const SettingsPage = () => {
   const { user } = useAuth();
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailConfig, setEmailConfig] = useState(null);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -1344,15 +1347,41 @@ const SettingsPage = () => {
     carry_forward: false,
     encashable: false
   });
+  const [emailFormData, setEmailFormData] = useState({
+    smtp_email: '',
+    smtp_password: '',
+    smtp_host: 'smtp.gmail.com',
+    smtp_port: 587,
+    company_name: ''
+  });
 
   useEffect(() => {
     fetchLeaveTypes();
+    fetchEmailConfig();
   }, []);
 
   const fetchLeaveTypes = async () => {
     try {
       const res = await axios.get(`${API_URL}/api/leave-types`);
       setLeaveTypes(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchEmailConfig = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/settings/email`);
+      setEmailConfig(res.data);
+      if (res.data.configured) {
+        setEmailFormData({
+          smtp_email: res.data.smtp_email || '',
+          smtp_password: '',
+          smtp_host: res.data.smtp_host || 'smtp.gmail.com',
+          smtp_port: res.data.smtp_port || 587,
+          company_name: res.data.company_name || ''
+        });
+      }
     } catch (err) {
       console.error(err);
     }
@@ -1371,6 +1400,30 @@ const SettingsPage = () => {
     }
   };
 
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/api/settings/email`, emailFormData);
+      toast.success('Email configuration saved!');
+      setShowEmailModal(false);
+      fetchEmailConfig();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to save email configuration');
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/settings/email/test`);
+      toast.success(`Test email sent to ${res.data.sent_to}`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to send test email');
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   return (
     <div data-testid="settings-page">
       <div className="mb-8">
@@ -1379,6 +1432,67 @@ const SettingsPage = () => {
       </div>
 
       <div className="grid gap-6">
+        {/* Email Configuration */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="font-heading font-semibold text-lg text-slate-900">Email Configuration</h3>
+              <p className="text-sm text-slate-500 mt-1">Configure SMTP settings for sending employee invitations</p>
+            </div>
+            <button 
+              data-testid="configure-email-btn" 
+              onClick={() => setShowEmailModal(true)} 
+              className={emailConfig?.configured ? "btn-secondary text-sm" : "btn-primary text-sm"}
+            >
+              {emailConfig?.configured ? 'Update Settings' : 'Configure Email'}
+            </button>
+          </div>
+          
+          {emailConfig?.configured ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-green-800">Email Configured</p>
+                  <p className="text-sm text-green-600">Emails will be sent from: {emailConfig.smtp_email}</p>
+                </div>
+                <button
+                  data-testid="test-email-btn"
+                  onClick={handleTestEmail}
+                  disabled={testingEmail}
+                  className="btn-secondary text-sm"
+                >
+                  {testingEmail ? 'Sending...' : 'Send Test'}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">SMTP Host</p>
+                  <p className="font-medium text-slate-900">{emailConfig.smtp_host}</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Company Name</p>
+                  <p className="font-medium text-slate-900">{emailConfig.company_name || 'Not set'}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 p-6 bg-slate-50 border border-slate-200 rounded-lg border-dashed">
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+                <Bell className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <p className="font-medium text-slate-700">Email not configured</p>
+                <p className="text-sm text-slate-500">Set up Gmail SMTP to send welcome emails to new employees</p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Leave Types */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-6">
@@ -1421,6 +1535,100 @@ const SettingsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Email Configuration Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-lg" data-testid="email-config-modal">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-heading text-xl font-bold text-slate-900">Email Configuration</h2>
+              <button onClick={() => setShowEmailModal(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 font-medium mb-2">How to get Gmail App Password:</p>
+              <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                <li>Go to your Google Account → Security</li>
+                <li>Enable 2-Factor Authentication if not enabled</li>
+                <li>Go to "App passwords" under 2FA settings</li>
+                <li>Create a new app password and copy the 16-digit code</li>
+              </ol>
+            </div>
+            
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Gmail Address</label>
+                <input
+                  data-testid="email-smtp-email-input"
+                  type="email"
+                  value={emailFormData.smtp_email}
+                  onChange={(e) => setEmailFormData({...emailFormData, smtp_email: e.target.value})}
+                  className="input-field"
+                  placeholder="your-email@gmail.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  App Password (16 digits)
+                  {emailConfig?.password_set && <span className="text-slate-400 font-normal"> - Leave empty to keep existing</span>}
+                </label>
+                <input
+                  data-testid="email-smtp-password-input"
+                  type="password"
+                  value={emailFormData.smtp_password}
+                  onChange={(e) => setEmailFormData({...emailFormData, smtp_password: e.target.value})}
+                  className="input-field font-mono"
+                  placeholder="xxxx xxxx xxxx xxxx"
+                  required={!emailConfig?.password_set}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                <input
+                  data-testid="email-company-name-input"
+                  type="text"
+                  value={emailFormData.company_name}
+                  onChange={(e) => setEmailFormData({...emailFormData, company_name: e.target.value})}
+                  className="input-field"
+                  placeholder="Your Company Name"
+                />
+                <p className="text-xs text-slate-500 mt-1">Used in email subject and body</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">SMTP Host</label>
+                  <input
+                    type="text"
+                    value={emailFormData.smtp_host}
+                    onChange={(e) => setEmailFormData({...emailFormData, smtp_host: e.target.value})}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">SMTP Port</label>
+                  <input
+                    type="number"
+                    value={emailFormData.smtp_port}
+                    onChange={(e) => setEmailFormData({...emailFormData, smtp_port: parseInt(e.target.value)})}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowEmailModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" data-testid="save-email-config-btn" className="btn-primary flex-1">
+                  Save Configuration
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Leave Type Modal */}
       {showModal && (
