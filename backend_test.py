@@ -582,6 +582,257 @@ class HRMSAPITester:
                      f"- Pending leaves: {data.get('pending_leaves', 0)}, Present this month: {data.get('present_this_month', 0)}")
         return success and has_keys
 
+    # ============== TIMESHEET MODULE TESTS ==============
+    
+    def test_create_client(self):
+        """Test creating a client"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        client_data = {
+            'name': f'Test Client {timestamp}',
+            'code': f'TC{timestamp}',
+            'description': 'Test client for API testing',
+            'contact_person': 'John Doe',
+            'contact_email': f'contact.{timestamp}@testclient.com',
+            'is_active': True
+        }
+        
+        success, data = self.make_request('POST', 'clients', client_data, 200)
+        if success and 'id' in data:
+            self.created_resources.setdefault('clients', []).append(data['id'])
+            self.log_test("Create Client", True, f"- ID: {data['id']}")
+            return data['id']
+        else:
+            self.log_test("Create Client", False, f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_get_clients(self):
+        """Test getting all clients"""
+        success, data = self.make_request('GET', 'clients')
+        self.log_test("Get Clients", success and isinstance(data, list))
+        return success
+
+    def test_get_client_by_id(self, client_id: str):
+        """Test getting a specific client"""
+        success, data = self.make_request('GET', f'clients/{client_id}')
+        self.log_test("Get Client by ID", success and 'id' in data, 
+                     f"- Client: {data.get('name', 'Unknown')}")
+        return success
+
+    def test_create_project(self, client_id: Optional[str] = None):
+        """Test creating a project"""
+        if not client_id:
+            # Create a client first
+            client_id = self.test_create_client()
+            if not client_id:
+                self.log_test("Create Project", False, "- No client available")
+                return None
+
+        timestamp = datetime.now().strftime("%H%M%S")
+        project_data = {
+            'name': f'Test Project {timestamp}',
+            'code': f'TP{timestamp}',
+            'client_id': client_id,
+            'description': 'Test project for API testing',
+            'start_date': datetime.now().strftime('%Y-%m-%d'),
+            'end_date': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d'),
+            'budget_hours': 100.0,
+            'is_billable': True,
+            'is_active': True
+        }
+        
+        success, data = self.make_request('POST', 'projects', project_data, 200)
+        if success and 'id' in data:
+            self.created_resources.setdefault('projects', []).append(data['id'])
+            self.log_test("Create Project", True, f"- ID: {data['id']}")
+            return data['id']
+        else:
+            self.log_test("Create Project", False, f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_get_projects(self):
+        """Test getting all projects"""
+        success, data = self.make_request('GET', 'projects')
+        self.log_test("Get Projects", success and isinstance(data, list))
+        return success
+
+    def test_get_project_by_id(self, project_id: str):
+        """Test getting a specific project"""
+        success, data = self.make_request('GET', f'projects/{project_id}')
+        expected_keys = ['id', 'name', 'client_name', 'logged_hours', 'billable_hours']
+        has_keys = all(key in data for key in expected_keys) if success else False
+        self.log_test("Get Project by ID", success and has_keys, 
+                     f"- Project: {data.get('name', 'Unknown')}, Hours: {data.get('logged_hours', 0)}")
+        return success
+
+    def test_create_task(self, project_id: Optional[str] = None):
+        """Test creating a task"""
+        if not project_id:
+            # Create a project first
+            project_id = self.test_create_project()
+            if not project_id:
+                self.log_test("Create Task", False, "- No project available")
+                return None
+
+        timestamp = datetime.now().strftime("%H%M%S")
+        task_data = {
+            'name': f'Test Task {timestamp}',
+            'project_id': project_id,
+            'description': 'Test task for API testing',
+            'is_billable': True
+        }
+        
+        success, data = self.make_request('POST', 'tasks', task_data, 200)
+        if success and 'id' in data:
+            self.created_resources.setdefault('tasks', []).append(data['id'])
+            self.log_test("Create Task", True, f"- ID: {data['id']}")
+            return data['id']
+        else:
+            self.log_test("Create Task", False, f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_get_tasks(self, project_id: Optional[str] = None):
+        """Test getting tasks"""
+        endpoint = 'tasks'
+        if project_id:
+            endpoint += f'?project_id={project_id}'
+        
+        success, data = self.make_request('GET', endpoint)
+        self.log_test("Get Tasks", success and isinstance(data, list), 
+                     f"- Found {len(data) if isinstance(data, list) else 0} tasks")
+        return success
+
+    def test_create_timesheet_entry(self, project_id: Optional[str] = None, task_id: Optional[str] = None):
+        """Test creating a timesheet entry"""
+        if not project_id:
+            # Create a project first
+            project_id = self.test_create_project()
+            if not project_id:
+                self.log_test("Create Timesheet Entry", False, "- No project available")
+                return None
+
+        entry_data = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'project_id': project_id,
+            'task_id': task_id,
+            'hours': 8.0,
+            'description': 'Test timesheet entry for API testing',
+            'is_billable': True
+        }
+        
+        success, data = self.make_request('POST', 'timesheets/entries', entry_data, 200)
+        if success and 'id' in data:
+            self.created_resources.setdefault('timesheet_entries', []).append(data['id'])
+            self.log_test("Create Timesheet Entry", True, f"- ID: {data['id']}, Hours: {entry_data['hours']}")
+            return data['id']
+        else:
+            self.log_test("Create Timesheet Entry", False, f"- {data.get('detail', 'Unknown error')}")
+            return None
+
+    def test_get_timesheet_entries(self):
+        """Test getting timesheet entries"""
+        success, data = self.make_request('GET', 'timesheets/entries')
+        self.log_test("Get Timesheet Entries", success and isinstance(data, list), 
+                     f"- Found {len(data) if isinstance(data, list) else 0} entries")
+        return success
+
+    def test_get_timesheet_entries_by_week(self):
+        """Test getting timesheet entries for a specific week"""
+        # Get current week start (Monday)
+        today = datetime.now()
+        week_start = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+        
+        success, data = self.make_request('GET', f'timesheets/entries?week_start={week_start}')
+        self.log_test("Get Timesheet Entries by Week", success and isinstance(data, list), 
+                     f"- Week {week_start}: {len(data) if isinstance(data, list) else 0} entries")
+        return success
+
+    def test_submit_timesheet(self):
+        """Test submitting timesheet for approval"""
+        # Get current week start (Monday)
+        today = datetime.now()
+        week_start = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+        
+        # First create a timesheet entry for this week
+        project_id = self.test_create_project()
+        if project_id:
+            entry_data = {
+                'date': week_start,
+                'project_id': project_id,
+                'hours': 8.0,
+                'description': 'Test entry for submission',
+                'is_billable': True
+            }
+            success, entry = self.make_request('POST', 'timesheets/entries', entry_data, 200)
+            if success:
+                self.created_resources.setdefault('timesheet_entries', []).append(entry['id'])
+
+        submit_data = {
+            'week_start': week_start,
+            'entries': []  # Backend will find all draft entries for the week
+        }
+        
+        success, data = self.make_request('POST', 'timesheets/submit', submit_data, 200)
+        self.log_test("Submit Timesheet", success and 'count' in data, 
+                     f"- Submitted {data.get('count', 0)} entries")
+        return success
+
+    def test_get_timesheet_summary(self):
+        """Test getting timesheet summary"""
+        # Get current week start (Monday)
+        today = datetime.now()
+        week_start = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+        
+        success, data = self.make_request('GET', f'timesheets/summary?week_start={week_start}')
+        expected_keys = ['total_hours', 'billable_hours', 'non_billable_hours', 'billable_percentage']
+        has_keys = all(key in data for key in expected_keys) if success else False
+        
+        self.log_test("Get Timesheet Summary", success and has_keys, 
+                     f"- Total: {data.get('total_hours', 0)}h, Billable: {data.get('billable_hours', 0)}h")
+        return success
+
+    def test_get_pending_approvals(self):
+        """Test getting pending timesheet approvals (admin only)"""
+        success, data = self.make_request('GET', 'timesheets/pending-approvals')
+        self.log_test("Get Pending Approvals", success and isinstance(data, list), 
+                     f"- Found {len(data) if isinstance(data, list) else 0} pending approvals")
+        return success
+
+    def test_approve_timesheet(self, user_id: Optional[str] = None):
+        """Test approving timesheet entries"""
+        if not user_id:
+            user_id = self.user_id
+        
+        # Get current week start (Monday)
+        today = datetime.now()
+        week_start = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+        
+        success, data = self.make_request('PUT', f'timesheets/approve?user_id={user_id}&week_start={week_start}', 
+                                        expected_status=200)
+        self.log_test("Approve Timesheet", success and 'count' in data, 
+                     f"- Approved {data.get('count', 0)} entries")
+        return success
+
+    def test_reject_timesheet(self, user_id: Optional[str] = None):
+        """Test rejecting timesheet entries"""
+        if not user_id:
+            user_id = self.user_id
+        
+        # Get current week start (Monday)
+        today = datetime.now()
+        week_start = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+        
+        success, data = self.make_request('PUT', f'timesheets/reject?user_id={user_id}&week_start={week_start}&reason=Test rejection', 
+                                        expected_status=200)
+        self.log_test("Reject Timesheet", success and 'count' in data, 
+                     f"- Rejected {data.get('count', 0)} entries")
+        return success
+
+    def test_delete_timesheet_entry(self, entry_id: str):
+        """Test deleting a timesheet entry"""
+        success, data = self.make_request('DELETE', f'timesheets/entries/{entry_id}', expected_status=200)
+        self.log_test("Delete Timesheet Entry", success and data.get('message') == 'Entry deleted')
+        return success
+
     def cleanup_resources(self):
         """Clean up created test resources"""
         print("\n🧹 Cleaning up test resources...")
