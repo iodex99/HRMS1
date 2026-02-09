@@ -2405,20 +2405,20 @@ async def delete_email_settings(user: dict = Depends(get_current_user)):
     return {"message": "Email configuration deleted"}
 
 # Seed initial super admin
-@app.on_event("startup")
-async def seed_data():
-    admin = await db.users.find_one({"email": "admin@bambooclone.com"})
-    if not admin:
-        await db.users.insert_one({
-            "email": "admin@bambooclone.com",
-            "password": pwd_context.hash("admin123"),
-            "full_name": "Super Admin",
-            "role": "super_admin",
-            "tenant_id": None,
-            "created_at": datetime.now(timezone.utc),
-            "is_active": True
-        })
-        print("Seeded super admin: admin@bambooclone.com / admin123")
+#@app.on_event("startup")
+#async def seed_data():
+#   admin = await db.users.find_one({"email": "admin@bambooclone.com"})
+#    if not admin:
+#        await db.users.insert_one({
+#           "email": "admin@bambooclone.com",
+#            "password": pwd_context.hash("admin123"),
+#            "full_name": "Super Admin",
+#           "role": "super_admin",
+#            "tenant_id": None,
+#            "created_at": datetime.now(timezone.utc),
+#           "is_active": True
+#        })
+#        print("Seeded super admin: admin@bambooclone.com / admin123")
 
 if __name__ == "__main__":
     import uvicorn
